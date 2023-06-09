@@ -95,7 +95,7 @@ jobs:
           APIKEY: ${{ secrets.NAIS_DEPLOY_APIKEY }}
           CLUSTER: dev-gcp
           RESOURCE: nais/nais-demo.yaml
-          VAR: image=${{ needs.build-demo.outputs.image }},ingress=https://${{ inputs.app }}.ekstern.dev.nav.no${{ inputs.base-path }},appname=${{ inputs.app }},replicas=1,branchState=alive
+          VAR: image=${{ needs.build-demo.outputs.image }},ingress=https://demo.ekstern.dev.nav.no${{ inputs.base-path }},appname=${{ inputs.app }},replicas=1,branchState=alive
 
   deploy-demo-branch:
     if: startsWith(github.ref_name, 'demo')
