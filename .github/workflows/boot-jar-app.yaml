@@ -26,7 +26,7 @@ jobs:
         id: setup-java
         with:
           distribution: "temurin"
-          java-version: "17"
+          java-version: "19"
 
       - run: ./gradlew bootJar -x test
         env:
