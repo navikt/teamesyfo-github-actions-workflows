@@ -48,7 +48,7 @@ This reusable workflows make the following assumptions:
 
    This dockerfile NEEDS to accept the argument `ENV` (`ARG ENV`) and copy the following: `COPY nais/envs/.env.$ENV /app/.env.production`
 
-2. The naiserator files are in the `nais` folder, named `nais-dev.yaml`, `nais-demo.yaml` and `nais-prod.yaml`.
+2. The naiserator files must be in the `nais` folder, named `nais-dev.yaml`, `nais-demo.yaml` and `nais-prod.yaml`.
 
    The `nais.demo.yaml` needs to be parameterized with the following:
 
@@ -77,6 +77,27 @@ This reusable workflows make the following assumptions:
 
    Note: Normal runtime-only (e.g. backend-only) envs can still be added in the nais.yaml.
    </details>
+
+### Deploying a Ktor or Spring Boot application (jar-app.yaml)
+<details>
+<summary>Detailed instructions</summary>
+
+#### 1. Add a new github workflow `deploy.yaml` with the following:
+
+```yaml
+name: Build & Deploy
+on: push
+
+jobs:
+   jar-app:
+      uses: navikt/teamesyfo-github-actions-workflows/.github/workflows/jar-app.yaml@main
+      secrets: inherit
+      with:
+         app: REPLACE_ME
+```
+</details>
+
+#### 2. The naiserator files must be in the `nais` folder, named `nais-dev.yaml` and `nais-prod.yaml`.
 
 ## 👥 Contact
 
