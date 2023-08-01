@@ -10,7 +10,7 @@ Builds 1 app per environment. Supports deploying demo-prefixed branches to their
 
 <details>
 <summary>Detailed instructions</summary>
-Add the main `deploy.yaml` with the following:
+Add a new github workflow `deploy-app.yaml` with the following:
 
 ```yaml
 name: Build & Deploy
@@ -82,7 +82,7 @@ This reusable workflows make the following assumptions:
 <details>
 <summary>Detailed instructions</summary>
 
-#### 1. Add a new github workflow `deploy.yaml` with the following:
+#### 1. Add a new github workflow `deploy-app.yaml` with the following:
 
 ```yaml
 name: Build & Deploy
