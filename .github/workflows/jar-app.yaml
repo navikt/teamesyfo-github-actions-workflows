@@ -22,11 +22,7 @@ jobs:
         with:
           languages: kotlin
 
-      - uses: actions/setup-java@v3
-        id: setup-java
-        with:
-          distribution: "temurin"
-          java-version: "19"
+      - uses: navikt/teamesyfo-github-actions-workflows/actions/gradle-cached@main
 
       - run: ./gradlew shadowJar -x test
         env:
