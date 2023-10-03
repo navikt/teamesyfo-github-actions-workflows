@@ -78,25 +78,6 @@ jobs:
           identity_provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
           project_id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
 
-#      - name: Slack Notification
-#        uses: rtCamp/action-slack-notify@b24d75fe0e728a4bf9fc42ee217caa686d141ee8
-#        if: failure() && github.ref_name == 'master'
-#        env:
-#            SLACK_COLOR: '#ff0000'
-#            SLACK_MESSAGE: ${{ inputs.app }} bygget feiler på master
-#            SLACK_TITLE: ':broken_heart:'
-#            SLACK_WEBHOOK: ${{ secrets.SPOKELSER_WEBHOOK }}
-
-#  trivy-docker:
-#    permissions:
-#      id-token: 'write'
-#      security-events: 'write'
-#    needs: build-and-publish
-#    uses: navikt/flex-github-actions-workflows/.github/workflows/trivy-docker.yml@master
-#    with:
-#      image: ${{ needs.build-and-publish.outputs.image }}
-#    secrets: inherit
-
   codeql-analyse:
     name: CodeQL-analyse
     runs-on: ubuntu-latest
@@ -124,31 +105,37 @@ jobs:
         with:
           category: "/language:java"
 
-  deploy-dev:
+  deploy-til-dev:
     name: Deploy to dev
     runs-on: ubuntu-latest
     needs: build-and-publish
+    secrets: inherit
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
       - uses: nais/deploy/actions/deploy@v1
+        name: Deploy to dev
         env:
           APIKEY: ${{ secrets.NAIS_DEPLOY_APIKEY }}
-          CLUSTER: dev-gcp
-          RESOURCE: nais/app/dev.yaml
-          VAR: image=${{ needs.build.outputs.image }}
+          CLUSTER: ${{ inputs.dev-cluster }}
+          IMAGE: ${{ needs.build-and-publish.outputs.image }}
+          RESOURCE: ${{ inputs.nais-template }}
+          VARS: ${{ inputs.dev-vars }}
 
-  deploy-prod:
+  deploy-til-prod:
     if: github.ref_name == 'main'
     name: Deploy to prod
     runs-on: ubuntu-latest
     needs: build-and-publish
+    secrets: inherit
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
       - uses: nais/deploy/actions/deploy@v1
-        with:
-          team: team-esyfo
+        name: Deploy to prod
         env:
           APIKEY: ${{ secrets.NAIS_DEPLOY_APIKEY }}
-          CLUSTER: prod-gcp
-          RESOURCE: nais/app/prod.yaml
-          VAR: image=${{ needs.build.outputs.image }}
+          IMAGE: ${{ needs.build-and-publish.outputs.image }}
+          CLUSTER: ${{ inputs.prod-cluster }}
+          RESOURCE: ${{ inputs.nais-template }}
+          VARS: ${{ inputs.prod-vars }}
