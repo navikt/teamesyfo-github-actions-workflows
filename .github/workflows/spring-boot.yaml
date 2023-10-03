@@ -14,6 +14,18 @@ on:
         required: false
         default: prod-gcp
         type: string
+      nais-template:
+        required: false
+        default: nais/app/naiserator.yaml
+        type: string
+      prod-vars:
+        required: false
+        default: nais/app/prod.yaml
+        type: string
+      dev-vars:
+        required: false
+        default: nais/app/dev.yaml
+        type: string
 
 jobs:
   build-and-publish:
