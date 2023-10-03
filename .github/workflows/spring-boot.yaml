@@ -6,6 +6,9 @@ on:
         required: false
         default: ${{ github.event.repository.name }}
         type: string
+      team:
+        required: true
+        type: string
       dev-cluster:
         required: false
         default: dev-gcp
@@ -142,6 +145,10 @@ jobs:
     name: Deploy to prod
     runs-on: ubuntu-latest
     needs: build-and-publish
+    metadata:
+      namespace: ${{ inputs.team }}
+      labels:
+        team: ${{ inputs.team }}
     steps:
       - uses: actions/checkout@v3
       - uses: nais/deploy/actions/deploy@v1
