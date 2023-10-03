@@ -6,9 +6,6 @@ on:
         required: false
         default: ${{ github.event.repository.name }}
         type: string
-      team:
-        required: true
-        type: string
       dev-cluster:
         required: false
         default: dev-gcp
