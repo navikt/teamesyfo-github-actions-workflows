@@ -61,7 +61,7 @@ jobs:
           VAR: image=${{ needs.build-dev.outputs.image }},version=${{ github.sha }}
 
   build-demo:
-    if: github.ref_name == 'main' || startsWith(github.ref_name, 'demo') && github.actor != 'dependabot[bot]'
+    if: github.ref_name == 'main' || startsWith(github.ref_name, 'demo')
     name: Build for demo
     runs-on: ubuntu-latest
     permissions:
@@ -81,7 +81,7 @@ jobs:
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-demo-main:
-    if: github.ref_name == 'main' && github.actor != 'dependabot[bot]'
+    if: github.ref_name == 'main'
     name: Deploy main to demo
     environment:
       name: demo-main
@@ -98,7 +98,7 @@ jobs:
           VAR: image=${{ needs.build-demo.outputs.image }},ingress=https://demo.ekstern.dev.nav.no${{ inputs.base-path }},appname=${{ inputs.app }},replicas=1,branchState=alive
 
   deploy-demo-branch:
-    if: startsWith(github.ref_name, 'demo') && github.actor != 'dependabot[bot]'
+    if: startsWith(github.ref_name, 'demo')
     name: Deploy branch to demo
     environment:
       name: demo-branch
@@ -119,7 +119,7 @@ jobs:
           VAR: image=${{ needs.build-demo.outputs.image }},ingress=https://${{ steps.slug.outputs.slug }}.ekstern.dev.nav.no${{ inputs.base-path }},appname=${{ steps.slug.outputs.slug }},replicas=1,branchState=alive
 
   build-prod:
-    if: github.ref_name == 'main' && github.actor != 'dependabot[bot]'
+    if: github.ref_name == 'main'
     name: Build for prod
     runs-on: ubuntu-latest
     permissions:
@@ -139,7 +139,7 @@ jobs:
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-prod:
-    if: github.ref_name == 'main' && github.actor != 'dependabot[bot]'
+    if: github.ref_name == 'main'
     name: Deploy to prod
     environment:
       name: production
