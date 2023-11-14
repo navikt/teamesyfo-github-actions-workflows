@@ -30,6 +30,14 @@ runs:
       shell: bash
       run: |
         ./gradlew shadowJar -x test
+    - name: Generate and output SBOM
+      env:
+        ORG_GRADLE_PROJECT_githubUser: x-access-token
+        ORG_GRADLE_PROJECT_githubPassword: ${{ inputs.github_token }}
+      uses: gradle/gradle-build-action@v2.6.1
+      with:
+        dependency-graph: generate-and-submit
+        arguments: build
     - name: Push docker image to GAR
       uses: nais/docker-build-push@v0
       id: docker-build-push
