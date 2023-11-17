@@ -1,6 +1,12 @@
 name: "Installs java, validates gradle wrapper, installs gradle dependencies with cache"
 description: "Installs java, validates gradle wrapper, installs gradle dependencies with cache"
 
+inputs:
+  dependency-graph:
+    description: 'Possible values: generate, generate-and-submit and download-and-submit. Default value is disabled. Only applicable to main branch'
+    required: false
+    default: disabled
+
 runs:
   using: "composite"
   steps:
@@ -22,4 +28,4 @@ runs:
         ORG_GRADLE_PROJECT_githubPassword: ${{ inputs.github_token }}
       uses: gradle/gradle-build-action@v2
       with:
-        dependency-graph: generate-and-submit
+        dependency-graph: ${{ inputs.dependency-graph }}

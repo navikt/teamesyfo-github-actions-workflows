@@ -23,6 +23,8 @@ runs:
   using: "composite"
   steps:
     - uses: navikt/teamesyfo-github-actions-workflows/actions/gradle-cached@main
+      with:
+        dependency-graph: generate-and-submit
     - name: Build jar
       env:
         ORG_GRADLE_PROJECT_githubUser: x-access-token
