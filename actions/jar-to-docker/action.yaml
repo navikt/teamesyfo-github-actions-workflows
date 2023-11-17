@@ -34,6 +34,7 @@ runs:
         ./gradlew shadowJar -x test
     - name: Push docker image to GAR
       uses: nais/docker-build-push@v0
+      if: ${{ github.actor != 'dependabot[bot]' }}
       id: docker-build-push
       with:
         team: team-esyfo
