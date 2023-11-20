@@ -15,7 +15,7 @@ runs:
       id: setup-java
       with:
         distribution: 'temurin'
-        java-version: '19'
+        java-version: '21'
     - uses: gradle/wrapper-validation-action@v1.1.0
       id: gradle-wrapper-validation
     - name: Setup Gradle
