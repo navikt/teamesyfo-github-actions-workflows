@@ -20,7 +20,7 @@ jobs:
       - run: npm run test
 
   build-dev:
-    if: ${{ !startsWith(github.ref_name, 'demo') }} && github.actor != 'dependabot[bot]'
+    if: ${{ !startsWith(github.ref_name, 'demo') }}
     name: Build for dev
     runs-on: ubuntu-latest
     permissions:
@@ -40,7 +40,7 @@ jobs:
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-dev:
-    if: ${{ !startsWith(github.ref_name, 'demo') }} && github.actor != 'dependabot[bot]'
+    if: ${{ !startsWith(github.ref_name, 'demo') && github.actor != 'dependabot[bot]' }}
     name: Deploy to dev
     environment:
       name: development
