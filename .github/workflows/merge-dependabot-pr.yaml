@@ -32,15 +32,6 @@ jobs:
                 .filter((it) => it.state == 'open')
                 .filter((it) => !it.head.repo.fork)
                 .filter((it) => it.labels.some((l) => l.name == 'automerge'))
-                .filter((it) => {
-                    const prCreated = new Date(it.created_at)
-                    if (it.title.includes('navikt') || it.title.includes('aksel')) {
-                      const twoDays = 2 * 60 * 60 * 1000
-                      return prCreated.getTime() < Date.now() - twoDays
-                    }
-                    const oneWeek = 7 * 24 * 60 * 60 * 1000
-                    return prCreated.getTime() < Date.now() - oneWeek
-                })
                 .map((it) => {
                     return {
                         title: it.title,
