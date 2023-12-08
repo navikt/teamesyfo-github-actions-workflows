@@ -14,7 +14,7 @@ jobs:
         if: ${{ steps.dependabot-metadata.outputs.update-type == 'version-update:semver-patch' }}
         run: |
           gh pr review $PR_URL --approve -b "I'm **approving** this pull request because **it includes a patch update**"
-          gh pr edit "$PR_URL" --add-label automerge --add-reviewer kaja-nav --repo $GITHUB_REPOSITORY
+          gh pr edit "$PR_URL" --add-label automerge --repo $GITHUB_REPOSITORY
         env:
           PR_URL: ${{github.event.pull_request.html_url}}
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
@@ -22,7 +22,15 @@ jobs:
         if: ${{ steps.dependabot-metadata.outputs.update-type == 'version-update:semver-minor' }}
         run: |
           gh pr review $PR_URL --approve -b "I'm **approving** this pull request because **it includes a minor update**"
-          gh pr edit "$PR_URL" --add-label automerge --add-reviewer kaja-nav --repo $GITHUB_REPOSITORY
+          gh pr edit "$PR_URL" --add-label automerge --repo $GITHUB_REPOSITORY
         env:
           PR_URL: ${{github.event.pull_request.html_url}}
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: Add Reviewers
+        uses: madrapps/add-reviewers@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          reviewers: kaja-nav
+          re-request-when-approved: true
+          re-request-when-changes-requested: true
+
