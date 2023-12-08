@@ -32,9 +32,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           debug: true
           script: |
-            github.pulls.requestReviewers({
+            github.rest.pulls.requestReviewers({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: context.payload.pull_request.number,
-              team_reviewers: ["kaja-nav"] # replace this with any team existing in your Github org
+              reviewers: ["kaja-nav"] # replace this with any team existing in your Github org
             });
