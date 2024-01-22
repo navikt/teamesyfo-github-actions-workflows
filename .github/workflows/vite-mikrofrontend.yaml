@@ -71,6 +71,7 @@ jobs:
       cluster: dev-gcp
       id: ${{ inputs.id }}
       url: ${{needs.build.outputs.cdn_url}}
+    secrets: inherit
 
   update-manifest-prod:
     if: github.ref == 'refs/heads/main'
@@ -80,3 +81,4 @@ jobs:
       cluster: prod-gcp
       id: ${{ inputs.id }}
       url: ${{needs.build.outputs.cdn_url}}
+    secrets: inherit
