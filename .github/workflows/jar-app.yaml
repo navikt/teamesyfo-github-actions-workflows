@@ -63,9 +63,8 @@ jobs:
     needs: [test, build]
     steps:
       - uses: actions/checkout@v3
-      - uses: nais/deploy/actions/deploy@v1
+      - uses: nais/deploy/actions/deploy@v2
         env:
-          APIKEY: ${{ secrets.NAIS_DEPLOY_APIKEY }}
           CLUSTER: dev-gcp
           RESOURCE: nais/nais-dev.yaml
           VAR: image=${{ needs.build.outputs.image }}
@@ -77,9 +76,8 @@ jobs:
     needs: [test, build]
     steps:
       - uses: actions/checkout@v3
-      - uses: nais/deploy/actions/deploy@v1
+      - uses: nais/deploy/actions/deploy@v2
         env:
-          APIKEY: ${{ secrets.NAIS_DEPLOY_APIKEY }}
           CLUSTER: prod-gcp
           RESOURCE: nais/nais-prod.yaml
           VAR: image=${{ needs.build.outputs.image }}
