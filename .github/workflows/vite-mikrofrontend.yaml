@@ -70,7 +70,7 @@ jobs:
   update-manifest-dev:
     if: ${{ github.actor != 'dependabot[bot]' }}
     needs: build
-    uses: navikt/tms-deploy/.github/workflows/oppdater-mikrofrontend-manifest.yaml@main
+    uses: navikt/tms-deploy/.github/workflows/oppdater-mikrofrontend-manifest-v2.yaml@main
     with:
       cluster: dev-gcp
       id: ${{ inputs.id }}
@@ -80,7 +80,7 @@ jobs:
   update-manifest-prod:
     if: github.ref == 'refs/heads/main'
     needs: build
-    uses: navikt/tms-deploy/.github/workflows/oppdater-mikrofrontend-manifest.yaml@main
+    uses: navikt/tms-deploy/.github/workflows/oppdater-mikrofrontend-manifest-v2.yaml@main
     with:
       cluster: prod-gcp
       id: ${{ inputs.id }}
