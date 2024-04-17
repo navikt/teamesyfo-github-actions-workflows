@@ -21,8 +21,6 @@ runs:
     - name: Setup Gradle
       if: github.ref_name != 'main'
       uses: gradle/gradle-build-action@v2
-      with:
-        arguments: detekt
     - name: Setup Gradle with dependency generation
       if: github.ref_name == 'main'
       env:
@@ -31,4 +29,3 @@ runs:
       uses: gradle/gradle-build-action@v2
       with:
         dependency-graph: ${{ inputs.dependency-graph }}
-        arguments: detekt
