@@ -20,12 +20,12 @@ runs:
       id: gradle-wrapper-validation
     - name: Setup Gradle
       if: github.ref_name != 'main'
-      uses: gradle/gradle-build-action@v2
+      uses: gradle/gradle-build-action@v3
     - name: Setup Gradle with dependency generation
       if: github.ref_name == 'main'
       env:
         ORG_GRADLE_PROJECT_githubUser: x-access-token
         ORG_GRADLE_PROJECT_githubPassword: ${{ inputs.github_token }}
-      uses: gradle/gradle-build-action@v2
+      uses: gradle/gradle-build-action@v3
       with:
         dependency-graph: ${{ inputs.dependency-graph }}
