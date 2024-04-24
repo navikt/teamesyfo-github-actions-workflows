@@ -45,7 +45,7 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: navikt/teamesyfo-github-actions-workflows/actions/gradle-cached-21@upgrade-gradle-wrapper-validation
+      - uses: navikt/teamesyfo-github-actions-workflows/actions/gradle-cached-21@main
       - run: ./gradlew test
         env:
           ORG_GRADLE_PROJECT_githubUser: x-access-token
