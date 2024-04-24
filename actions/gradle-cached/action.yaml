@@ -16,8 +16,7 @@ runs:
       with:
         distribution: 'temurin'
         java-version: '19'
-    - uses: gradle/wrapper-validation-action@v1.1.0
-      id: gradle-wrapper-validation
+    - uses: gradle/actions/wrapper-validation@v3
     - name: Setup Gradle
       if: github.ref_name != 'main'
       uses: gradle/gradle-build-action@v3
