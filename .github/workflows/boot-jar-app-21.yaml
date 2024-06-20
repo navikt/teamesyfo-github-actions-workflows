@@ -30,6 +30,9 @@ jobs:
           languages: ${{ matrix.language }}
       - name: Run detekt
         run: ./gradlew detekt
+        env:
+          ORG_GRADLE_PROJECT_githubUser: x-access-token
+          ORG_GRADLE_PROJECT_githubPassword: ${{ secrets.GITHUB_TOKEN }}
       - name: Build bootJar artifacts
         run: |
           ./gradlew bootJar -x test
