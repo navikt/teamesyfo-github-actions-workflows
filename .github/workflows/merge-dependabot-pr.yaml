@@ -10,7 +10,7 @@ jobs:
         with:
           script: |
             const today = new Date();
-            const sommerStart = new Date(today.getFullYear(), 5, 20);
+            const sommerStart = new Date(today.getFullYear(), 6, 6);
             const sommerSlutt = new Date(today.getFullYear(), 7, 7);
             const julStart = new Date(today.getFullYear(), 11, 20);
             const julSlutt = new Date(today.getFullYear(), 11, 31);
