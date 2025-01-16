@@ -34,6 +34,8 @@ runs:
         ./gradlew bootJar -x test
     - name: Push docker image to GAR
       uses: nais/docker-build-push@v0
+      env:
+        TRIVY_JAVA_DB_REPOSITORY: "public.ecr.aws/aquasecurity/trivy-java-db:1"
       if: ${{ github.actor != 'dependabot[bot]' }}
       id: docker-build-push
       with:
