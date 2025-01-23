@@ -6,7 +6,7 @@ This is a repository for GitHub actions workflows for teamesyfo
 
 ### Deploying a Next application (next-app.yaml)
 
-Builds 1 app per environment. Supports deploying demo-prefixed branches to their own ingress.
+Builds 1 app per environment. Supports deploying demo-prefixed branches to their own ingress. Demo-applications will be deleted in 48 hours.
 
 <details>
 <summary>Detailed instructions</summary>
@@ -19,21 +19,6 @@ on: push
 jobs:
   next-app:
     uses: navikt/teamesyfo-github-actions-workflows/.github/workflows/next-app.yaml@main
-    secrets: inherit
-    with:
-      app: REPLACE_ME
-      base-path: REPLACE_ME
-```
-
-Add the secondary `demo-delete.yaml` with the following:
-
-```yaml
-name: Demo delete
-on: delete
-
-jobs:
-  branch-delete:
-    uses: navikt/teamesyfo-github-actions-workflows/.github/workflows/next-app-demo-delete.yaml@main
     secrets: inherit
     with:
       app: REPLACE_ME
