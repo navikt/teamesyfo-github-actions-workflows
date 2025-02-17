@@ -35,8 +35,6 @@ jobs:
         with:
           app: ${{ inputs.app }}
           env: dev
-          identity_provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
-          project_id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-dev:
@@ -75,8 +73,6 @@ jobs:
         with:
           app: ${{ inputs.app }}
           env: demo
-          identity_provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
-          project_id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-demo-main:
@@ -131,8 +127,6 @@ jobs:
         with:
           app: ${{ inputs.app }}
           env: prod
-          identity_provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
-          project_id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-prod:

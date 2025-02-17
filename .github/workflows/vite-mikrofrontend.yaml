@@ -47,8 +47,6 @@ jobs:
           team: team-esyfo
           source: ./dist/
           destination: ${{ inputs.app }}
-          identity_provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
-          project_id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
 
       - name: Extract manifest url
         id: extract-manifest-url
@@ -64,8 +62,6 @@ jobs:
         id: docker-build-push
         with:
           team: team-esyfo
-          identity_provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
-          project_id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
 
   update-manifest-dev:
     if: ${{ github.actor != 'dependabot[bot]' }}
