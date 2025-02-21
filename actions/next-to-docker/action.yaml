@@ -8,12 +8,6 @@ inputs:
   env:
     required: true
     type: string
-  identity_provider:
-    required: true
-    type: string
-  project_id:
-    required: true
-    type: string
   NPM_AUTH_TOKEN:
     required: true
     type: string
@@ -53,6 +47,4 @@ runs:
       id: docker-build-push
       with:
         team: team-esyfo
-        identity_provider: ${{ inputs.identity_provider }}
-        project_id: ${{ inputs.project_id }}
         image_suffix: ${{ inputs.env }}
