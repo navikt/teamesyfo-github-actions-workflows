@@ -34,7 +34,7 @@ jobs:
     steps:
       - uses: navikt/teamesyfo-github-actions-workflows/actions/gradle-cached@main
       - name: Run Tests
-        run: ./gradlew test --info --stacktrace
+        run: ./gradlew test --scan
         env:
           ORG_GRADLE_PROJECT_githubUser: x-access-token
           ORG_GRADLE_PROJECT_githubPassword: ${{ secrets.GITHUB_TOKEN }}
