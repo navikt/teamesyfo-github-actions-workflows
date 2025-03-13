@@ -33,10 +33,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: navikt/teamesyfo-github-actions-workflows/actions/gradle-cached@main
-      - run: ./gradlew test
+      - name: Run Tests
+        run: ./gradlew test --info --stacktrace
         env:
           ORG_GRADLE_PROJECT_githubUser: x-access-token
           ORG_GRADLE_PROJECT_githubPassword: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload Test Report
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-report
+          path: build/reports/tests/test
+      - name: Upload Build Scan
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-scan
+          path: build/scan
 
   build:
     name: Build
