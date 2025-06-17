@@ -42,7 +42,7 @@ jobs:
       - name: cdn-upload
         id: cdn-upload
         uses: nais/deploy/actions/cdn-upload/v2@master
-        if: ${{ github.actor != 'dependabot[bot]' }}
+        if: ${{ github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false }}
         with:
           team: team-esyfo
           source: ./dist/
@@ -50,21 +50,21 @@ jobs:
 
       - name: Extract manifest url
         id: extract-manifest-url
-        if: ${{ github.actor != 'dependabot[bot]' }}
+        if: ${{ github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false }}
         run: |
           files="${{ steps.cdn-upload.outputs.uploaded }}"
           first_file=$(echo $files | cut -d',' -f1)
           echo "url=https://cdn.nav.no/$first_file" >> $GITHUB_OUTPUT
 
       - name: Build and push docker image
-        if: ${{ github.actor != 'dependabot[bot]' }}
+        if: ${{ github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false }}
         uses: nais/docker-build-push@v0
         id: docker-build-push
         with:
           team: team-esyfo
 
   update-manifest-dev:
-    if: ${{ github.actor != 'dependabot[bot]' }}
+    if: ${{ github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false }}
     needs: build
     uses: navikt/tms-deploy/.github/workflows/oppdater-mikrofrontend-manifest-v2.yaml@main
     with:

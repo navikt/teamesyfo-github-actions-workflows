@@ -38,7 +38,7 @@ jobs:
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-dev:
-    if: ${{ !startsWith(github.ref_name, 'demo') && github.actor != 'dependabot[bot]' }}
+    if: ${{ !startsWith(github.ref_name, 'demo') && github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false }}
     name: Deploy to dev
     environment:
       name: development

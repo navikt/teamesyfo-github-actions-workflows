@@ -2,7 +2,7 @@ on:
   workflow_call:
 jobs:
   deploy-dev:
-    if: github.ref_name != 'main'
+    if: github.ref_name != 'main' && github.event.pull_request.draft == false
     name: Deploy to dev
     runs-on: ubuntu-latest
     steps:
