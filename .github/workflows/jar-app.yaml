@@ -25,7 +25,7 @@ jobs:
           languages: kotlin
       - uses: navikt/teamesyfo-github-actions-workflows/actions/gradle-cached@java-version-by-parameter
         with:
-          java-verison: ${{inputs.java-version}}
+          java-version: ${{inputs.java-version}}
       - name: Build shadowJar
         shell: bash
         run: ./gradlew shadowJar -x test
@@ -43,7 +43,7 @@ jobs:
     steps:
       - uses: navikt/teamesyfo-github-actions-workflows/actions/gradle-cached@java-version-by-parameter
         with:
-          java-verison: ${{inputs.java-version}}
+          java-version: ${{inputs.java-version}}
       - run: ./gradlew test
         env:
           ORG_GRADLE_PROJECT_githubUser: x-access-token
