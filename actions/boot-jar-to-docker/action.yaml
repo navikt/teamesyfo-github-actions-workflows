@@ -20,7 +20,7 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - uses: navikt/teamesyfo-github-actions-workflows/actions/gradle-cached@main
+    - uses: navikt/teamesyfo-github-actions-workflows/actions/gradle-cached@java-version-by-parameter
       with:
         dependency-graph: generate-and-submit
         java-version: ${{inputs.java-version}}
