@@ -3,9 +3,13 @@ description: "Installs java, validates gradle wrapper, installs gradle dependenc
 
 inputs:
   dependency-graph:
-    description: 'Possible values: generate, generate-and-submit and download-and-submit. Default value is disabled. Only applicable to main branch'
+    description: "Possible values: generate, generate-and-submit and download-and-submit. Default value is disabled. Only applicable to main branch"
     required: false
     default: disabled
+  java-version:
+    description: "The version of jave to be used in setup-java"
+    required: false
+    default: "19"
 
 runs:
   using: "composite"
@@ -14,8 +18,8 @@ runs:
     - uses: actions/setup-java@v4
       id: setup-java
       with:
-        distribution: 'temurin'
-        java-version: '19'
+        distribution: "temurin"
+        java-version: ${{inputs.java-version}}
     - uses: gradle/actions/wrapper-validation@v4
     - name: Setup Gradle
       if: github.ref_name != 'main'
