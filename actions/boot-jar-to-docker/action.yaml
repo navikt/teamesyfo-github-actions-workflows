@@ -4,10 +4,14 @@ description: "Builds a bootjar, creates a docker image and uploads it to GAR"
 inputs:
   app:
     required: true
-    type: string
+    description: "Name of the application"
   github_token:
+    description: "github token"
     required: true
-    type: string
+  java-version:
+    description: "The version of jave to be used in setup-java"
+    required: false
+    default: "19"
 outputs:
   image:
     description: "Docker image in GAR"
@@ -19,6 +23,7 @@ runs:
     - uses: navikt/teamesyfo-github-actions-workflows/actions/gradle-cached@main
       with:
         dependency-graph: generate-and-submit
+        java-version: ${{inputs.java-version}}
     - name: Build bootJar
       env:
         ORG_GRADLE_PROJECT_githubUser: x-access-token

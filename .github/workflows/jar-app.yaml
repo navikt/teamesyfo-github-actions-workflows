@@ -4,6 +4,10 @@ on:
       app:
         required: true
         type: string
+      java-version:
+        required: true
+        type: string
+        default: "19"
 jobs:
   analyze:
     name: Analyze
@@ -20,8 +24,13 @@ jobs:
         with:
           languages: kotlin
       - uses: navikt/teamesyfo-github-actions-workflows/actions/gradle-cached@main
-      - run: ./gradlew shadowJar -x test
+        with:
+          java-version: ${{inputs.java-version}}
+      - name: Build shadowJar
+        shell: bash
+        run: ./gradlew shadowJar -x test
         env:
+          JAVA_OPTS: "-Xmx2g -XX:MaxMetaspaceSize=1g"
           ORG_GRADLE_PROJECT_githubUser: x-access-token
           ORG_GRADLE_PROJECT_githubPassword: ${{ secrets.GITHUB_TOKEN }}
       - uses: github/codeql-action/analyze@v3
@@ -33,6 +42,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: navikt/teamesyfo-github-actions-workflows/actions/gradle-cached@main
+        with:
+          java-version: ${{inputs.java-version}}
       - run: ./gradlew test
         env:
           ORG_GRADLE_PROJECT_githubUser: x-access-token
@@ -53,6 +64,7 @@ jobs:
         with:
           app: ${{ inputs.app }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          java-version: ${{ inputs.java-version }}
 
   deploy-dev:
     if: ${{ github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false }}
