@@ -5,7 +5,7 @@ on:
         required: true
         type: string
       java-version:
-        required: true
+        required: false
         type: string
         default: "19"
 jobs:
