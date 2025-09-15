@@ -31,7 +31,8 @@ jobs:
         run: ./gradlew shadowJar -x test
         env:
           JAVA_OPTS: "-Xmx2g -XX:MaxMetaspaceSize=1g"
-          ORG_GRADLE_JVMARGS: "-Xmx2g"
+          ORG_GRADLE_JVMARGS: "-Xmx3g"
+          KOTLIN_DAEMON_JVMARGS: "-Xmx2g"
           ORG_GRADLE_PROJECT_githubUser: x-access-token
           ORG_GRADLE_PROJECT_githubPassword: ${{ secrets.GITHUB_TOKEN }}
       - uses: github/codeql-action/analyze@v3
