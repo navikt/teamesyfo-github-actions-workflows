@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test-and-verify, build-dev]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - id: get-ingress
         uses: mikefarah/yq@v4.47.1
         with:
@@ -84,7 +84,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test-and-verify, build-demo]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: nais/deploy/actions/deploy@v2
         env:
           CLUSTER: dev-gcp
@@ -100,7 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test-and-verify, build-demo]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: gacts/github-slug@v1
         id: slug
         with:
@@ -138,7 +138,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test-and-verify, build-prod]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - id: get-ingress
         uses: mikefarah/yq@v4.47.1
         with:
