@@ -16,15 +16,15 @@ runs:
       with:
         distribution: 'temurin'
         java-version: '21'
-    - uses: gradle/actions/wrapper-validation@v4
+    - uses: gradle/actions/wrapper-validation@v5
     - name: Setup Gradle
       if: github.ref_name != 'main'
-      uses: gradle/actions/setup-gradle@v4
+      uses: gradle/actions/setup-gradle@v5
     - name: Setup Gradle with dependency generation
       if: github.ref_name == 'main'
       env:
         ORG_GRADLE_PROJECT_githubUser: x-access-token
         ORG_GRADLE_PROJECT_githubPassword: ${{ inputs.github_token }}
-      uses: gradle/actions/setup-gradle@v4
+      uses: gradle/actions/setup-gradle@v5
       with:
         dependency-graph: ${{ inputs.dependency-graph }}
