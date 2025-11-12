@@ -7,7 +7,10 @@ on:
       base-path:
         required: true
         type: string
-
+      node-version:
+        required: false
+        type: string
+        default: "20.x"
 jobs:
   test-and-verify:
     name: Test and lint
@@ -16,6 +19,7 @@ jobs:
       - uses: navikt/teamesyfo-github-actions-workflows/actions/npm-cached@main
         with:
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          node-version: ${{ inputs.node-version }}
       - run: npm run lint && tsc
       - run: npm run test
 
@@ -36,6 +40,7 @@ jobs:
           app: ${{ inputs.app }}
           env: dev
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          node-version: ${{ inputs.node-version }}
 
   deploy-dev:
     if: ${{ !startsWith(github.ref_name, 'demo') && github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false }}
@@ -74,6 +79,7 @@ jobs:
           app: ${{ inputs.app }}
           env: demo
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          node-version: ${{ inputs.node-version }}
 
   deploy-demo-main:
     if: github.ref_name == 'main'
@@ -128,6 +134,7 @@ jobs:
           app: ${{ inputs.app }}
           env: prod
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          node-version: ${{ inputs.node-version }}
 
   deploy-prod:
     if: github.ref_name == 'main'
