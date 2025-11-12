@@ -7,7 +7,10 @@ on:
       base-path:
         required: true
         type: string
-
+      node-version:
+        required: false
+        type: string
+        default: "20.x"
 jobs:
   test-and-verify:
     name: Test and lint
@@ -16,6 +19,7 @@ jobs:
       - uses: navikt/teamesyfo-github-actions-workflows/actions/npm-cached@main
         with:
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          node-version: ${{ inputs.node-version }}
       - run: npm run lint && tsc
       - run: npm run test
 

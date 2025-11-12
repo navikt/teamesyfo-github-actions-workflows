@@ -5,6 +5,10 @@ inputs:
   NPM_AUTH_TOKEN:
     required: true
     type: string
+  node-version:
+    required: false
+    type: string
+    default: "20.x"
 
 runs:
   using: "composite"

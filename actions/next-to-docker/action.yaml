@@ -11,6 +11,10 @@ inputs:
   NPM_AUTH_TOKEN:
     required: true
     type: string
+  node-version:
+    required: false
+    type: string
+    default: "20.x"
 outputs:
   image:
     description: "Docker image in GAR"
@@ -22,6 +26,7 @@ runs:
     - uses: navikt/teamesyfo-github-actions-workflows/actions/npm-cached@main
       with:
         NPM_AUTH_TOKEN: ${{ inputs.NPM_AUTH_TOKEN }}
+        node-version: ${{ inputs.node-version }}
     - name: Copy appropriate env file to root
       shell: bash
       run: |
