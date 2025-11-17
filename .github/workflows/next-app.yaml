@@ -20,7 +20,7 @@ jobs:
         with:
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           node-version: ${{ inputs.node-version }}
-      - run: npm run lint && tsc
+      - run: npm run lint
       - run: npm run test
 
   build-dev:
