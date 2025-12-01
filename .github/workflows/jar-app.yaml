@@ -28,7 +28,7 @@ jobs:
           java-version: ${{inputs.java-version}}
       - name: Build shadowJar
         shell: bash
-        run: ./gradlew clean shadowJar -x test --no-daemon
+        run: ./gradlew clean shadowJar -x test --no-daemon --no-build-cache
         env:
           JAVA_OPTS: "-Xmx2g -XX:MaxMetaspaceSize=1g"
           ORG_GRADLE_PROJECT_githubUser: x-access-token
