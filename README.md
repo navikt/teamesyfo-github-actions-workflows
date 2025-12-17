@@ -6,6 +6,42 @@ This is a repository for GitHub actions workflows for teamesyfo
 
 ### Deploying a Next application (next-app.yaml)
 
+```mermaid
+flowchart TD
+    subgraph Tests
+        A[test-and-verify<br><i>Test and lint</i>]
+        B[e2e-tests<br><i>E2E tests</i><br>if: playwright]
+    end
+
+    subgraph "Dev Environment"
+        C[build-dev<br><i>Build for dev</i><br>if: !demo branch]
+        D[deploy-dev<br><i>Deploy to dev</i>]
+    end
+
+    subgraph "Demo Environment"
+        E[build-demo<br><i>Build for demo</i><br>if: main or demo branch]
+        F[deploy-demo-main<br><i>Deploy main to demo</i><br>if: main]
+        G[deploy-demo-branch<br><i>Deploy branch to demo</i><br>if: demo branch]
+    end
+
+    subgraph "Prod Environment"
+        H[build-prod<br><i>Build for prod</i><br>if: main]
+        I[deploy-prod<br><i>Deploy to prod</i><br>if: main]
+    end
+
+    A --> B
+    A --> C
+    A --> E
+    A --> H
+    B -.->|success or skipped| C
+    B -.->|success or skipped| E
+    B -.->|success or skipped| H
+    C --> D
+    E --> F
+    E --> G
+    H --> I
+```
+
 Builds 1 app per environment. Supports deploying demo-prefixed branches to their own ingress. Demo-applications will be deleted in 48 hours.
 
 <details>
@@ -64,6 +100,7 @@ This reusable workflows make the following assumptions:
    </details>
 
 ### Deploying a Ktor or Spring Boot application (jar-app.yaml)
+
 <details>
 <summary>Detailed instructions</summary>
 
@@ -74,12 +111,13 @@ name: Build & Deploy
 on: push
 
 jobs:
-   jar-app:
-      uses: navikt/teamesyfo-github-actions-workflows/.github/workflows/jar-app.yaml@main
-      secrets: inherit
-      with:
-         app: REPLACE_ME
+  jar-app:
+    uses: navikt/teamesyfo-github-actions-workflows/.github/workflows/jar-app.yaml@main
+    secrets: inherit
+    with:
+      app: REPLACE_ME
 ```
+
 </details>
 
 #### 2. The naiserator files must be in the `nais` folder, named `nais-dev.yaml` and `nais-prod.yaml`.
