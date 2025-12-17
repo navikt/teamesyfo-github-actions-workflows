@@ -37,7 +37,7 @@ jobs:
     name: E2E tests
     runs-on: ubuntu-latest
     steps:
-      - uses: navikt/teamesyfo-github-actions-workflows/actions/playwright-e2e@feat/playwright-e2e-action
+      - uses: navikt/teamesyfo-github-actions-workflows/actions/playwright-e2e@main
         with:
           npm-auth-token: ${{ secrets.GITHUB_TOKEN }}
           node-version: ${{ inputs.node-version }}
