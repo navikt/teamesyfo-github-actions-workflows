@@ -43,7 +43,11 @@ jobs:
           node-version: ${{ inputs.node-version }}
 
   build-dev:
-    if: ${{ !startsWith(github.ref_name, 'demo') && (needs.e2e-tests.result == 'success' || needs.e2e-tests.result == 'skipped') }}
+    if: |
+      always() && !cancelled() &&
+      needs.test-and-verify.result == 'success' &&
+      (needs.e2e-tests.result == 'success' || needs.e2e-tests.result == 'skipped') &&
+      !startsWith(github.ref_name, 'demo')
     needs: [test-and-verify, e2e-tests]
     name: Build for dev
     runs-on: ubuntu-latest
@@ -83,7 +87,11 @@ jobs:
           VAR: image=${{ needs.build-dev.outputs.image }},version=${{ github.sha }}
 
   build-demo:
-    if: ${{ (github.ref_name == 'main' || startsWith(github.ref_name, 'demo')) && (needs.e2e-tests.result == 'success' || needs.e2e-tests.result == 'skipped') }}
+    if: |
+      always() && !cancelled() &&
+      needs.test-and-verify.result == 'success' &&
+      (needs.e2e-tests.result == 'success' || needs.e2e-tests.result == 'skipped') &&
+      (github.ref_name == 'main' || startsWith(github.ref_name, 'demo'))
     needs: [test-and-verify, e2e-tests]
     name: Build for demo
     runs-on: ubuntu-latest
@@ -139,7 +147,11 @@ jobs:
           VAR: image=${{ needs.build-demo.outputs.image }},ingress=https://${{ steps.slug.outputs.slug }}.ekstern.dev.nav.no${{ inputs.base-path }},appname=${{ steps.slug.outputs.slug }},replicas=1,branchState=alive,ttl=48h
 
   build-prod:
-    if: ${{ github.ref_name == 'main' && (needs.e2e-tests.result == 'success' || needs.e2e-tests.result == 'skipped') }}
+    if: |
+      always() && !cancelled() &&
+      needs.test-and-verify.result == 'success' &&
+      (needs.e2e-tests.result == 'success' || needs.e2e-tests.result == 'skipped') &&
+      github.ref_name == 'main'
     needs: [test-and-verify, e2e-tests]
     name: Build for prod
     runs-on: ubuntu-latest

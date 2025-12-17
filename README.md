@@ -30,12 +30,12 @@ flowchart TD
     end
 
     A --> B
-    A --> C
-    A --> E
-    A --> H
-    B -.->|success or skipped| C
-    B -.->|success or skipped| E
-    B -.->|success or skipped| H
+    A -->|success| C
+    A -->|success| E
+    A -->|success| H
+    B -->|success or skipped| C
+    B -->|success or skipped| E
+    B -->|success or skipped| H
     C --> D
     E --> F
     E --> G
