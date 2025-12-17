@@ -12,7 +12,7 @@ inputs:
     default: --with-deps chromium
   test-command:
     description: Command that runs the e2e tests
-    default: "npx playwright test --reporter=list,github"
+    default: "npx playwright test --reporter=html,github"
   artifact-name:
     description: Name for the uploaded Playwright report artifact
     default: playwright-report
