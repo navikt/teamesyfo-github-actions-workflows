@@ -2,16 +2,20 @@ on:
   workflow_call:
     inputs:
       app:
+        description: "Name of the application."
         required: true
         type: string
       base-path:
+        description: "Base path for the application ingress (e.g., /my-app)."
         required: true
         type: string
       node-version:
+        description: "Node.js version to use for the workflow."
         required: false
         type: string
         default: "20.x"
       e2e-test-framework:
+        description: "E2E test framework to use. Supported: 'playwright'. Leave empty to skip E2E tests."
         required: false
         type: string
         default: ""
