@@ -11,6 +11,10 @@ on:
         required: false
         type: string
         default: "20.x"
+      e2e-test-framework:
+        required: false
+        type: string
+        default: ""
 jobs:
   test-and-verify:
     name: Test and lint
@@ -23,8 +27,20 @@ jobs:
       - run: npm run lint
       - run: npm run test
 
+  e2e-tests:
+    if: inputs.e2e-test-framework == 'playwright'
+    needs: [test-and-verify]
+    name: E2E tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: navikt/teamesyfo-github-actions-workflows/actions/playwright-e2e@main
+        with:
+          npm-auth-token: ${{ secrets.GITHUB_TOKEN }}
+          node-version: ${{ inputs.node-version }}
+
   build-dev:
-    if: ${{ !startsWith(github.ref_name, 'demo') }}
+    if: ${{ !startsWith(github.ref_name, 'demo') && (needs.e2e-tests.result == 'success' || needs.e2e-tests.result == 'skipped') }}
+    needs: [test-and-verify, e2e-tests]
     name: Build for dev
     runs-on: ubuntu-latest
     permissions:
@@ -63,7 +79,8 @@ jobs:
           VAR: image=${{ needs.build-dev.outputs.image }},version=${{ github.sha }}
 
   build-demo:
-    if: github.ref_name == 'main' || startsWith(github.ref_name, 'demo')
+    if: ${{ (github.ref_name == 'main' || startsWith(github.ref_name, 'demo')) && (needs.e2e-tests.result == 'success' || needs.e2e-tests.result == 'skipped') }}
+    needs: [test-and-verify, e2e-tests]
     name: Build for demo
     runs-on: ubuntu-latest
     permissions:
@@ -118,7 +135,8 @@ jobs:
           VAR: image=${{ needs.build-demo.outputs.image }},ingress=https://${{ steps.slug.outputs.slug }}.ekstern.dev.nav.no${{ inputs.base-path }},appname=${{ steps.slug.outputs.slug }},replicas=1,branchState=alive,ttl=48h
 
   build-prod:
-    if: github.ref_name == 'main'
+    if: ${{ github.ref_name == 'main' && (needs.e2e-tests.result == 'success' || needs.e2e-tests.result == 'skipped') }}
+    needs: [test-and-verify, e2e-tests]
     name: Build for prod
     runs-on: ubuntu-latest
     permissions:
