@@ -1,12 +1,6 @@
 name: Playwright E2E Tests
 description: Run Playwright end-to-end tests for Next.js apps
 inputs:
-  npm-auth-token:
-    description: Token with read access to the npm registry
-    required: true
-  node-version:
-    description: Node version to install
-    default: 24.x
   playwright-browsers-args:
     description: Extra args for `npx playwright install`
     default: --with-deps chromium
@@ -22,11 +16,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: navikt/teamesyfo-github-actions-workflows/actions/npm-cached@main
-      with:
-        NPM_AUTH_TOKEN: ${{ inputs.npm-auth-token }}
-        node-version: ${{ inputs.node-version }}
-
     - name: Install Playwright browsers
       run: npx playwright install ${{ inputs.playwright-browsers-args }}
       shell: bash
