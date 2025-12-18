@@ -1,0 +1,32 @@
+name: Playwright E2E Tests
+description: Run Playwright end-to-end tests for Next.js apps
+inputs:
+  playwright-browsers-args:
+    description: Extra args for `npx playwright install`
+    default: --with-deps chromium
+  test-command:
+    description: Command that runs the e2e tests
+    default: "npx playwright test --reporter=html,github"
+  artifact-name:
+    description: Name for the uploaded Playwright report artifact
+    default: playwright-report
+  retention-days:
+    description: Artifact retention
+    default: "30"
+runs:
+  using: composite
+  steps:
+    - name: Install Playwright browsers
+      run: npx playwright install ${{ inputs.playwright-browsers-args }}
+      shell: bash
+
+    - name: Run Playwright tests
+      run: ${{ inputs.test-command }}
+      shell: bash
+
+    - if: ${{ !cancelled() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: playwright-report/
+        retention-days: ${{ inputs.retention-days }}
