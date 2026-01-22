@@ -83,14 +83,13 @@ jobs:
           exit 1
       - name: Upload static files to NAV CDN
         if: ${{ inputs.cdn-upload }}
-        uses: navikt/teamesyfo-github-actions-workflows/actions/cdn-upload@main
+        uses: nais/deploy/actions/cdn-upload/v2@master
         with:
           team: ${{ inputs.cdn-team }}
           source: ./.next/static
           destination: ${{ inputs.cdn-destination != '' && inputs.cdn-destination || format('/{0}{1}/_next', inputs.app, inputs.base-path) }}
-          nais-management-project-id: ${{ inputs.nais-management-project-id }}
-          nais-workload-identity-provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
-          skip-if-source-missing: false
+          project_id: ${{ inputs.nais-management-project-id }}
+          identity_provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
 
   deploy-dev:
     if: ${{ !startsWith(github.ref_name, 'demo') && github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false }}
@@ -140,14 +139,13 @@ jobs:
           exit 1
       - name: Upload static files to NAV CDN
         if: ${{ inputs.cdn-upload }}
-        uses: navikt/teamesyfo-github-actions-workflows/actions/cdn-upload@main
+        uses: nais/deploy/actions/cdn-upload/v2@master
         with:
           team: ${{ inputs.cdn-team }}
           source: ./.next/static
           destination: ${{ inputs.cdn-destination != '' && inputs.cdn-destination || format('/{0}{1}/_next', inputs.app, inputs.base-path) }}
-          nais-management-project-id: ${{ inputs.nais-management-project-id }}
-          nais-workload-identity-provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
-          skip-if-source-missing: false
+          project_id: ${{ inputs.nais-management-project-id }}
+          identity_provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
 
   deploy-demo-main:
     if: github.ref_name == 'main'
@@ -213,14 +211,13 @@ jobs:
           exit 1
       - name: Upload static files to NAV CDN
         if: ${{ inputs.cdn-upload }}
-        uses: navikt/teamesyfo-github-actions-workflows/actions/cdn-upload@main
+        uses: nais/deploy/actions/cdn-upload/v2@master
         with:
           team: ${{ inputs.cdn-team }}
           source: ./.next/static
           destination: ${{ inputs.cdn-destination != '' && inputs.cdn-destination || format('/{0}{1}/_next', inputs.app, inputs.base-path) }}
-          nais-management-project-id: ${{ inputs.nais-management-project-id }}
-          nais-workload-identity-provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
-          skip-if-source-missing: false
+          project_id: ${{ inputs.nais-management-project-id }}
+          identity_provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
 
   deploy-prod:
     if: github.ref_name == 'main'

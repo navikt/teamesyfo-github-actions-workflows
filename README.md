@@ -40,6 +40,8 @@ jobs:
       # nais-management-project-id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
       # Optional: override destination (defaults to '/<app><base-path>/_next')
       # cdn-destination: '/REPLACE_ME'
+      # Optional: override team (defaults to team-esyfo)
+      # cdn-team: team-esyfo
 ```
 
 #### **Important:**
@@ -79,6 +81,40 @@ This reusable workflows make the following assumptions:
 
    Note: Normal runtime-only (e.g. backend-only) envs can still be added in the nais.yaml.
    </details>
+
+### Uploading `public/**` to NAV CDN (cdn-public-upload.yaml)
+
+This is useful for rarely changed assets in `public/` (e.g. images) so you don't need to upload them on every build.
+
+Note: If your repo does not have a `public/` folder, the workflow will default to skipping the upload (no-op). Set `skip-if-source-missing: false` if you want it to fail instead.
+
+Add a workflow in your app repo, for example `.github/workflows/upload-public-to-cdn.yaml`:
+
+```yaml
+name: Upload public files to NAV CDN
+on:
+  push:
+    paths:
+      - public/**
+  workflow_dispatch:
+
+jobs:
+  cdn-public:
+    uses: navikt/teamesyfo-github-actions-workflows/.github/workflows/cdn-public-upload.yaml@main
+    permissions:
+      contents: read
+      id-token: write
+    secrets: inherit
+    with:
+      app: REPLACE_ME
+      nais-management-project-id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
+      # Optional: fail instead of skipping if the folder doesn't exist
+      # skip-if-source-missing: false
+      # Optional: override destination (defaults to '/<app>')
+      # destination: '/REPLACE_ME'
+      # Optional: override team (defaults to team-esyfo)
+      # team: team-esyfo
+```
 
 ### Deploying a Ktor or Spring Boot application (jar-app.yaml)
 
