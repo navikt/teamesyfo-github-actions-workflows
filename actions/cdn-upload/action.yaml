@@ -1,0 +1,58 @@
+name: "Upload to NAV CDN"
+description: "Backwards compatible wrapper around nais/deploy/actions/cdn-upload."
+
+inputs:
+  team:
+    description: "NAIS team name used for CDN upload (e.g. team-esyfo)."
+    required: false
+    default: "team-esyfo"
+  source:
+    description: "Path to local folder to upload."
+    required: true
+  destination:
+    description: "Destination path in the team CDN. Must start with '/'."
+    required: true
+  nais-management-project-id:
+    description: "NAIS management project id used for CDN upload (typically vars.NAIS_MANAGEMENT_PROJECT_ID)."
+    required: true
+  nais-workload-identity-provider:
+    description: "Workload identity provider (typically secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER)."
+    required: true
+  skip-if-source-missing:
+    description: "If true, skip upload when the source folder does not exist."
+    required: false
+    default: "false"
+
+outputs:
+  uploaded:
+    description: "List of uploaded files, returned by the underlying NAIS action."
+    value: ${{ steps.cdn-upload.outputs.uploaded }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate source folder
+      shell: bash
+      run: |
+        if [[ -d "${{ inputs.source }}" ]]; then
+          exit 0
+        fi
+
+        if [[ "${{ inputs.skip-if-source-missing }}" == "true" ]]; then
+          echo "Source folder '${{ inputs.source }}' not found; skipping CDN upload."
+          exit 0
+        fi
+
+        echo "Source folder '${{ inputs.source }}' not found."
+        exit 1
+
+    - name: Upload to NAV CDN
+      id: cdn-upload
+      if: ${{ github.actor != 'dependabot[bot]' }}
+      uses: nais/deploy/actions/cdn-upload/v2@master
+      with:
+        team: ${{ inputs.team }}
+        source: ${{ inputs.source }}
+        destination: ${{ inputs.destination }}
+        project_id: ${{ inputs.nais-management-project-id }}
+        identity_provider: ${{ inputs.nais-workload-identity-provider }}
