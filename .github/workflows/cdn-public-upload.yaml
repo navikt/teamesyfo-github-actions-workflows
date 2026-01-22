@@ -1,0 +1,63 @@
+name: Upload public files to NAV CDN
+
+on:
+  workflow_call:
+    inputs:
+      team:
+        description: "NAIS team name used for CDN upload (e.g. team-esyfo)."
+        required: false
+        type: string
+        default: "team-esyfo"
+      source:
+        description: "Path to local folder to upload. Typically './public'."
+        required: false
+        type: string
+        default: "./public"
+      app:
+        description: "Application name. Used to derive destination when destination is not provided."
+        required: false
+        type: string
+        default: ""
+      destination:
+        description: "Destination path in the team CDN. Defaults to '/<app>'."
+        required: false
+        type: string
+        default: ""
+      nais-management-project-id:
+        description: "NAIS management project id used for CDN upload. Typically passed from caller as vars.NAIS_MANAGEMENT_PROJECT_ID."
+        required: false
+        type: string
+        default: ""
+      skip-if-source-missing:
+        description: "If true (default), skip upload when the source folder does not exist."
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  upload-public:
+    name: Upload public files to NAV CDN
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate destination config
+        shell: bash
+        run: |
+          if [[ -z "${{ inputs.destination }}" && -z "${{ inputs.app }}" ]]; then
+            echo "Either 'app' or 'destination' input must be set"
+            exit 1
+          fi
+
+      - name: Upload public files to NAV CDN
+        uses: navikt/teamesyfo-github-actions-workflows/actions/cdn-upload@main
+        with:
+          team: ${{ inputs.team }}
+          source: ${{ inputs.source }}
+          destination: ${{ inputs.destination != '' && inputs.destination || format('/{0}', inputs.app) }}
+          nais-management-project-id: ${{ inputs.nais-management-project-id }}
+          nais-workload-identity-provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
+          skip-if-source-missing: ${{ inputs.skip-if-source-missing }}
