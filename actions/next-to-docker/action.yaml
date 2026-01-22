@@ -36,15 +36,6 @@ runs:
       run: npm run build
       env:
         NEXT_PUBLIC_VERSION: ${{ github.sha }}
-    - name: Upload static files to NAV CDN
-      uses: nais/deploy/actions/cdn-upload/v2@master
-      if: ${{ github.actor != 'dependabot[bot]' }}
-      with:
-        team: team-esyfo
-        source: ./.next/static
-        destination: "/${{ inputs.app }}/_next"
-        identity_provider: ${{ inputs.identity_provider }}
-        project_id: ${{ inputs.project_id }}
     - name: Push docker image to GAR
       uses: nais/docker-build-push@v0
       if: ${{ github.actor != 'dependabot[bot]' }}

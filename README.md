@@ -34,6 +34,12 @@ jobs:
     with:
       app: REPLACE_ME
       base-path: REPLACE_ME
+      # Optional: upload Next.js build assets (.next/static) to NAV CDN
+      # cdn-upload: true
+      # Required when cdn-upload is enabled:
+      # nais-management-project-id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
+      # Optional: override destination (defaults to '/<app><base-path>/_next')
+      # cdn-destination: '/REPLACE_ME'
 ```
 
 #### **Important:**
