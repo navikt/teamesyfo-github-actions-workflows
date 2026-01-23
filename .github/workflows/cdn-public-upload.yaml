@@ -23,11 +23,6 @@ on:
         required: false
         type: string
         default: ""
-      nais-management-project-id:
-        description: "NAIS management project id used for CDN upload. Typically passed from caller as vars.NAIS_MANAGEMENT_PROJECT_ID."
-        required: false
-        type: string
-        default: ""
       skip-if-source-missing:
         description: "If true (default), skip upload when the source folder does not exist."
         required: false
@@ -62,11 +57,6 @@ jobs:
             exit 1
           fi
 
-          if [[ -z "${{ inputs.nais-management-project-id }}" ]]; then
-            echo "'nais-management-project-id' input must be set (typically vars.NAIS_MANAGEMENT_PROJECT_ID)."
-            exit 1
-          fi
-
           if [[ "${{ steps.check-source.outputs.exists }}" != "true" ]]; then
             if [[ "${{ inputs.skip-if-source-missing }}" == "true" ]]; then
               echo "Source folder '${{ inputs.source }}' not found; skipping CDN upload."
@@ -84,5 +74,5 @@ jobs:
           team: ${{ inputs.team }}
           source: ${{ inputs.source }}
           destination: ${{ inputs.destination != '' && inputs.destination || format('/{0}', inputs.app) }}
-          project_id: ${{ inputs.nais-management-project-id }}
+          project_id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
           identity_provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}

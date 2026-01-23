@@ -47,7 +47,7 @@ jobs:
     outputs:
       image: ${{ steps.build-and-publish.outputs.image }}
     steps:
-      - uses: navikt/teamesyfo-github-actions-workflows/actions/next-to-docker@main
+      - uses: navikt/teamesyfo-github-actions-workflows/actions/next-to-docker@add-cdn-support-for-next
         id: build-and-publish
         with:
           app: ${{ inputs.app }}
