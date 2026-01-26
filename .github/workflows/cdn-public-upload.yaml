@@ -39,16 +39,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Check source folder
-        id: check-source
-        shell: bash
-        run: |
-          if [[ -d "${{ inputs.source }}" ]]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Validate destination config
         shell: bash
         run: |
@@ -57,22 +47,12 @@ jobs:
             exit 1
           fi
 
-          if [[ "${{ steps.check-source.outputs.exists }}" != "true" ]]; then
-            if [[ "${{ inputs.skip-if-source-missing }}" == "true" ]]; then
-              echo "Source folder '${{ inputs.source }}' not found; skipping CDN upload."
-              exit 0
-            fi
-
-            echo "Source folder '${{ inputs.source }}' not found."
-            exit 1
-          fi
-
       - name: Upload public files to NAV CDN
-        if: ${{ steps.check-source.outputs.exists == 'true' && github.actor != 'dependabot[bot]' }}
-        uses: nais/deploy/actions/cdn-upload/v2@master
+        uses: navikt/teamesyfo-github-actions-workflows/actions/cdn-upload@main
         with:
           team: ${{ inputs.team }}
           source: ${{ inputs.source }}
           destination: ${{ inputs.destination != '' && inputs.destination || format('/{0}', inputs.app) }}
-          project_id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
-          identity_provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
+          nais-management-project-id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
+          nais-workload-identity-provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
+          skip-if-source-missing: ${{ inputs.skip-if-source-missing }}

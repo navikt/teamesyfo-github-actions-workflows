@@ -5,16 +5,7 @@ inputs:
   app:
     required: true
     type: string
-  base_path:
-    required: true
-    type: string
   env:
-    required: true
-    type: string
-  identity_provider:
-    required: true
-    type: string
-  project_id:
     required: true
     type: string
   NPM_AUTH_TOKEN:
@@ -45,16 +36,6 @@ runs:
       run: npm run build
       env:
         NEXT_PUBLIC_VERSION: ${{ github.sha }}
-
-    - name: Upload static files to NAV CDN
-      if: ${{ github.actor != 'dependabot[bot]' }}
-      uses: nais/deploy/actions/cdn-upload/v2@master
-      with:
-        team: team-esyfo
-        source: ./.next/static
-        destination: "/${{ inputs.app }}${{ inputs.base_path }}/_next"
-        identity_provider: ${{ inputs.identity_provider }}
-        project_id: ${{ inputs.project_id }}
     - name: Push docker image to GAR
       uses: nais/docker-build-push@v0
       if: ${{ github.actor != 'dependabot[bot]' }}

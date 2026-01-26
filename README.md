@@ -34,9 +34,10 @@ jobs:
     with:
       app: REPLACE_ME
       base-path: REPLACE_ME
-      # CDN upload is handled automatically (requires org/repo config):
-      # - vars.NAIS_MANAGEMENT_PROJECT_ID
-      # - secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER
+      # Optional: upload Next.js build assets (.next/static) to NAV CDN
+      # cdn-upload: true
+      # Required when cdn-upload is enabled:
+      # nais-management-project-id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
 ```
 
 #### **Important:**
@@ -102,6 +103,7 @@ jobs:
     secrets: inherit
     with:
       app: REPLACE_ME
+      nais-management-project-id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
       # Optional: fail instead of skipping if the folder doesn't exist
       # skip-if-source-missing: false
       # Optional: override destination (defaults to '/<app>')

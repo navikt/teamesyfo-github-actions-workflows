@@ -19,6 +19,21 @@ on:
         required: false
         type: string
         default: ""
+      cdn-upload:
+        description: "Upload Next.js static assets (.next/static) to NAV CDN. Requires NAIS Workload Identity secrets/vars in the calling repo/org."
+        required: false
+        type: boolean
+        default: false
+      cdn-team:
+        description: "NAIS team name used for CDN upload (e.g. team-esyfo)."
+        required: false
+        type: string
+        default: "team-esyfo"
+      cdn-destination:
+        description: "Destination path in the team CDN. Defaults to '/<app>/_next'."
+        required: false
+        type: string
+        default: ""
 jobs:
   test-and-verify:
     name: Test and lint
@@ -47,16 +62,29 @@ jobs:
     outputs:
       image: ${{ steps.build-and-publish.outputs.image }}
     steps:
-      - uses: navikt/teamesyfo-github-actions-workflows/actions/next-to-docker@add-cdn-support-for-next
+      - uses: navikt/teamesyfo-github-actions-workflows/actions/next-to-docker@main
         id: build-and-publish
         with:
           app: ${{ inputs.app }}
-          base_path: ${{ inputs.base-path }}
           env: dev
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           node-version: ${{ inputs.node-version }}
-          identity_provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
-          project_id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
+      - name: Validate CDN config
+        if: ${{ inputs.cdn-upload && vars.NAIS_MANAGEMENT_PROJECT_ID == '' }}
+        shell: bash
+        run: |
+          echo "cdn-upload is enabled, but 'nais-management-project-id' is not set."
+          echo "Set vars.NAIS_MANAGEMENT_PROJECT_ID in the repo or org."
+          exit 1
+      - name: Upload static files to NAV CDN
+        if: ${{ inputs.cdn-upload }}
+        uses: navikt/teamesyfo-github-actions-workflows/actions/cdn-upload@main
+        with:
+          team: ${{ inputs.cdn-team }}
+          source: ./.next/static
+          destination: ${{ inputs.cdn-destination != '' && inputs.cdn-destination || format('/{0}/_next', inputs.app) }}
+          nais-management-project-id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
+          nais-workload-identity-provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
 
   deploy-dev:
     if: ${{ !startsWith(github.ref_name, 'demo') && github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false }}
@@ -94,12 +122,25 @@ jobs:
         id: build-and-publish
         with:
           app: ${{ inputs.app }}
-          base_path: ${{ inputs.base-path }}
           env: demo
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           node-version: ${{ inputs.node-version }}
-          identity_provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
-          project_id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
+      - name: Validate CDN config
+        if: ${{ inputs.cdn-upload && vars.NAIS_MANAGEMENT_PROJECT_ID == '' }}
+        shell: bash
+        run: |
+          echo "cdn-upload is enabled, but 'nais-management-project-id' is not set."
+          echo "Set vars.NAIS_MANAGEMENT_PROJECT_ID in the repo or org."
+          exit 1
+      - name: Upload static files to NAV CDN
+        if: ${{ inputs.cdn-upload }}
+        uses: navikt/teamesyfo-github-actions-workflows/actions/cdn-upload@main
+        with:
+          team: ${{ inputs.cdn-team }}
+          source: ./.next/static
+          destination: ${{ inputs.cdn-destination != '' && inputs.cdn-destination || format('/{0}/_next', inputs.app) }}
+          nais-management-project-id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
+          nais-workload-identity-provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
 
   deploy-demo-main:
     if: github.ref_name == 'main'
@@ -153,12 +194,25 @@ jobs:
         id: build-and-publish
         with:
           app: ${{ inputs.app }}
-          base_path: ${{ inputs.base-path }}
           env: prod
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           node-version: ${{ inputs.node-version }}
-          identity_provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
-          project_id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
+      - name: Validate CDN config
+        if: ${{ inputs.cdn-upload && vars.NAIS_MANAGEMENT_PROJECT_ID == '' }}
+        shell: bash
+        run: |
+          echo "cdn-upload is enabled, but 'nais-management-project-id' is not set."
+          echo "Set vars.NAIS_MANAGEMENT_PROJECT_ID in the repo or org."
+          exit 1
+      - name: Upload static files to NAV CDN
+        if: ${{ inputs.cdn-upload }}
+        uses: navikt/teamesyfo-github-actions-workflows/actions/cdn-upload@main
+        with:
+          team: ${{ inputs.cdn-team }}
+          source: ./.next/static
+          destination: ${{ inputs.cdn-destination != '' && inputs.cdn-destination || format('/{0}/_next', inputs.app) }}
+          nais-management-project-id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
+          nais-workload-identity-provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
 
   deploy-prod:
     if: github.ref_name == 'main'
