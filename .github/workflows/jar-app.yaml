@@ -23,6 +23,7 @@ jobs:
       - uses: github/codeql-action/init@v4
         with:
           languages: kotlin
+          tools: linked
       - uses: navikt/teamesyfo-github-actions-workflows/actions/gradle-cached@main
         with:
           java-version: ${{inputs.java-version}}
