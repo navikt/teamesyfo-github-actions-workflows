@@ -101,14 +101,14 @@ jobs:
 
 Auto-approves and enables auto-merge for safe Dependabot PRs (patch and minor updates). Major updates are left for manual review.
 
-Uses `gh pr merge --auto --squash`, which means **GitHub will not merge the PR until all required status checks in branch protection pass**.
+Uses `gh pr merge --auto --squash`, which means GitHub will only merge when branch protection requirements are satisfied (required checks/reviews, if configured). **If you do not have required checks configured, the PR may merge immediately after this workflow runs.**
 
 <details>
 <summary>Detailed instructions</summary>
 
 #### Prerequisites
 
-1. **Branch protection** must be enabled on the default branch with at least one required status check (e.g. a CI "Merge gate" job). Without this, `gh pr merge --auto` will fail.
+1. **Branch protection** should be enabled on the default branch with at least one required status check (e.g. a CI "Merge gate" job). Without required checks, Dependabot PRs can merge without running CI.
 2. **"Allow auto-merge"** must be enabled in the repository settings (Settings → General → Pull Requests).
 
 #### Setup
@@ -123,10 +123,14 @@ on:
 
 jobs:
   automerge:
-    uses: navikt/teamesyfo-github-actions-workflows/.github/workflows/dependabot-automerge.yml@main
+    permissions:
+      contents: write
+      pull-requests: write
+    # Prefer pinning to a tag/SHA; @main is easier but less controlled.
+    uses: navikt/teamesyfo-github-actions-workflows/.github/workflows/dependabot-automerge.yml@efe0ae8f5d3627f70e0a6c3461d2af9ca85d3a0a
 ```
 
-No secrets need to be passed — the workflow uses `GITHUB_TOKEN` with the necessary permissions.
+No secrets need to be passed — the workflow uses `GITHUB_TOKEN`, but the caller must grant the write permissions shown above.
 
 #### Policy
 

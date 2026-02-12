@@ -4,10 +4,9 @@ name: Dependabot auto-approve and auto-merge
 # Dependabot PRs (patch and minor updates). Major updates are left for
 # manual review.
 #
-# Prerequisites:
+# Prerequisites (recommended):
 #   - Branch protection with required status checks (e.g. a CI merge gate)
-#     must be enabled on the default branch. `gh pr merge --auto` relies on
-#     branch protection to gate the actual merge.
+#     on the default branch. Without required checks, PRs may merge immediately.
 #   - "Allow auto-merge" must be enabled in the repo settings.
 
 on:
