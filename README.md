@@ -110,6 +110,7 @@ Uses `gh pr merge --auto --squash`, which means GitHub will only merge when bran
 
 1. **Branch protection** should be enabled on the default branch with at least one required status check (e.g. a CI "Merge gate" job). Without required checks, Dependabot PRs can merge without running CI.
 2. **"Allow auto-merge"** must be enabled in the repository settings (Settings → General → Pull Requests).
+3. **Allow GitHub Actions to create and approve pull requests** must be enabled in the repository settings (Settings → Actions → General → Workflow permissions), and workflow permissions must be set to **Read and write permissions** so that `GITHUB_TOKEN` can approve and merge Dependabot PRs.
 
 #### Setup
 
