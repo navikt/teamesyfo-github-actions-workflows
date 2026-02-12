@@ -1,0 +1,69 @@
+name: Dependabot auto-approve and auto-merge
+
+# Reusable workflow that auto-approves and enables auto-merge for safe
+# Dependabot PRs (patch and minor updates). Major updates are left for
+# manual review.
+#
+# Prerequisites:
+#   - Branch protection with required status checks (e.g. a CI merge gate)
+#     must be enabled on the default branch. `gh pr merge --auto` relies on
+#     branch protection to gate the actual merge.
+#   - "Allow auto-merge" must be enabled in the repo settings.
+
+on:
+  workflow_call:
+
+jobs:
+  dependabot:
+    runs-on: ubuntu-latest
+    if: >-
+      ${{
+        github.event.pull_request.user.login == 'dependabot[bot]' &&
+        !github.event.pull_request.head.repo.fork
+      }}
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Fetch Dependabot metadata
+        id: dependabot-metadata
+        uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a
+
+      - name: Decide policy
+        id: policy
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          update_type='${{ steps.dependabot-metadata.outputs.update-type }}'
+          echo "Update type: $update_type"
+
+          if [[ "$update_type" == "version-update:semver-patch" || "$update_type" == "version-update:semver-minor" ]]; then
+            echo "should_automerge=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Major or unknown update — skipping auto-merge."
+            echo "should_automerge=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Approve PR
+        if: ${{ steps.policy.outputs.should_automerge == 'true' }}
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          decision="$(gh pr view "$PR_URL" --json reviewDecision -q .reviewDecision)"
+          if [[ "$decision" != "APPROVED" ]]; then
+            gh pr review --approve "$PR_URL" -b "Auto-approving safe Dependabot update (patch/minor)."
+          else
+            echo "PR already approved."
+          fi
+
+      - name: Enable auto-merge (squash)
+        if: ${{ steps.policy.outputs.should_automerge == 'true' }}
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh pr merge --auto --squash "$PR_URL"

@@ -97,6 +97,49 @@ jobs:
 
 #### 2. The naiserator files must be in the `nais` folder, named `nais-dev.yaml` and `nais-prod.yaml`.
 
+### Auto-merging Dependabot PRs (dependabot-automerge.yml)
+
+Auto-approves and enables auto-merge for safe Dependabot PRs (patch and minor updates). Major updates are left for manual review.
+
+Uses `gh pr merge --auto --squash`, which means **GitHub will not merge the PR until all required status checks in branch protection pass**.
+
+<details>
+<summary>Detailed instructions</summary>
+
+#### Prerequisites
+
+1. **Branch protection** must be enabled on the default branch with at least one required status check (e.g. a CI "Merge gate" job). Without this, `gh pr merge --auto` will fail.
+2. **"Allow auto-merge"** must be enabled in the repository settings (Settings → General → Pull Requests).
+
+#### Setup
+
+Add a workflow file (e.g. `.github/workflows/dependabot-automerge.yml`):
+
+```yaml
+name: Dependabot auto-merge
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  automerge:
+    uses: navikt/teamesyfo-github-actions-workflows/.github/workflows/dependabot-automerge.yml@main
+```
+
+No secrets need to be passed — the workflow uses `GITHUB_TOKEN` with the necessary permissions.
+
+#### Policy
+
+| Update type | Auto-merged? |
+|-------------|-------------|
+| Patch       | ✅ Yes       |
+| Minor       | ✅ Yes       |
+| Major       | ❌ No — requires manual review |
+
+The policy applies equally to all ecosystems (npm, gradle, github-actions) and all dependency types (production and development).
+
+</details>
+
 ## 👥 Contact
 
 This project is maintained by [navikt/team-esyfo](CODEOWNERS)
