@@ -1,0 +1,53 @@
+name: "Build Next.js app and push to Docker"
+description: "Builds a Next.js App with pnpm, creates a docker image and uploads it to GAR"
+
+inputs:
+  app:
+    description: "Application name"
+    required: true
+  env:
+    description: "Environment name"
+    required: true
+  NPM_AUTH_TOKEN:
+    description: "NPM authentication token"
+    required: true
+  node-version:
+    description: "Node version"
+    required: false
+
+outputs:
+  image:
+    description: "Docker image in GAR"
+    value: ${{ steps.docker-build-push.outputs.image }}
+
+runs:
+  using: "composite"
+  steps:
+    - uses: navikt/teamesyfo-github-actions-workflows/actions/setup-pnpm@main
+      with:
+        NPM_AUTH_TOKEN: ${{ inputs.NPM_AUTH_TOKEN }}
+        node-version: ${{ inputs.node-version }}
+    - name: Copy appropriate env file to root
+      shell: bash
+      run: |
+        echo "Copying nais/envs/.env.${{ inputs.env }}..."
+        cp nais/envs/.env.${{ inputs.env }} .env.production
+    - name: Build application
+      shell: bash
+      run: pnpm run build
+      env:
+        NEXT_PUBLIC_VERSION: ${{ github.sha }}
+    - name: Upload static files to NAV CDN
+      uses: nais/deploy/actions/cdn-upload/v2@master
+      if: ${{ github.actor != 'dependabot[bot]' }}
+      with:
+        team: team-esyfo
+        source: ./.next/static
+        destination: "/${{ inputs.app }}/_next"
+    - name: Push docker image to GAR
+      uses: nais/docker-build-push@v0
+      if: ${{ github.actor != 'dependabot[bot]' }}
+      id: docker-build-push
+      with:
+        team: team-esyfo
+        image_suffix: ${{ inputs.env }}

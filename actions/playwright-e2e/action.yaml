@@ -1,12 +1,15 @@
 name: Playwright E2E Tests
 description: Run Playwright end-to-end tests for Next.js apps
 inputs:
+  package-manager:
+    description: Package manager to use (npx for npm, pnpm for pnpm)
+    default: npx
   playwright-browsers-args:
-    description: Extra args for `npx playwright install`
+    description: Extra args for `playwright install`
     default: --with-deps chromium
   test-command:
-    description: Command that runs the e2e tests
-    default: "npx playwright test --reporter=html,github"
+    description: Command that runs the e2e tests (leave empty to use default based on package-manager)
+    default: ""
   artifact-name:
     description: Name for the uploaded Playwright report artifact
     default: playwright-report
@@ -17,11 +20,11 @@ runs:
   using: composite
   steps:
     - name: Install Playwright browsers
-      run: npx playwright install ${{ inputs.playwright-browsers-args }}
+      run: ${{ inputs.package-manager }} playwright install ${{ inputs.playwright-browsers-args }}
       shell: bash
 
     - name: Run Playwright tests
-      run: ${{ inputs.test-command }}
+      run: ${{ inputs.test-command || format('{0} playwright test --reporter=html,github', inputs.package-manager) }}
       shell: bash
 
     - if: ${{ !cancelled() }}
