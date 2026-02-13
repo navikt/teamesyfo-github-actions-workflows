@@ -1,3 +1,5 @@
+name: "Next.js App Build and Deploy (v2)"
+
 on:
   workflow_call:
     inputs:
