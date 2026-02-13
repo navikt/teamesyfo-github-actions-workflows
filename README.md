@@ -127,7 +127,6 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    # Prefer pinning to a tag/SHA; @main is easier but less controlled.
     uses: navikt/teamesyfo-github-actions-workflows/.github/workflows/dependabot-automerge.yaml@main
 ```
 
