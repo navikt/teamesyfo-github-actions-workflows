@@ -13,7 +13,7 @@ inputs:
     required: true
   node-version:
     description: "Node version"
-    required: false
+    required: true
 
 outputs:
   image:
