@@ -97,6 +97,54 @@ jobs:
 
 #### 2. The naiserator files must be in the `nais` folder, named `nais-dev.yaml` and `nais-prod.yaml`.
 
+### Auto-merging Dependabot PRs (dependabot-automerge.yaml)
+
+Auto-approves and enables auto-merge for safe Dependabot PRs (patch and minor updates). Major updates are left for manual review.
+
+Uses `gh pr merge --auto --squash`, which means GitHub will only merge when branch protection requirements are satisfied (required checks/reviews, if configured). **If you do not have required checks configured, the PR may merge immediately after this workflow runs.**
+
+<details>
+<summary>Detailed instructions</summary>
+
+#### Prerequisites
+
+1. **Branch protection** should be enabled on the default branch with at least one required status check (e.g. a CI "Merge gate" job). Without required checks, Dependabot PRs can merge without running CI.
+2. **"Allow auto-merge"** must be enabled in the repository settings (Settings → General → Pull Requests).
+3. **Allow GitHub Actions to create and approve pull requests** must be enabled in the repository settings (Settings → Actions → General → Workflow permissions), and workflow permissions must be set to **Read and write permissions** so that `GITHUB_TOKEN` can approve and merge Dependabot PRs.
+
+#### Setup
+
+Add a workflow file (e.g. `.github/workflows/dependabot-automerge.yaml`):
+
+```yaml
+name: Dependabot auto-merge
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  automerge:
+    permissions:
+      contents: write
+      pull-requests: write
+    # Prefer pinning to a tag/SHA; @main is easier but less controlled.
+    uses: navikt/teamesyfo-github-actions-workflows/.github/workflows/dependabot-automerge.yaml@main
+```
+
+No secrets need to be passed — the workflow uses `GITHUB_TOKEN`, but the caller must grant the write permissions shown above.
+
+#### Policy
+
+| Update type | Auto-merged? |
+|-------------|-------------|
+| Patch       | ✅ Yes       |
+| Minor       | ✅ Yes       |
+| Major       | ❌ No — requires manual review |
+
+The policy applies equally to all ecosystems (npm, gradle, github-actions) and all dependency types (production and development).
+
+</details>
+
 ## 👥 Contact
 
 This project is maintained by [navikt/team-esyfo](CODEOWNERS)
