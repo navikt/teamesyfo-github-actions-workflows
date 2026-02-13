@@ -25,7 +25,7 @@ jobs:
     name: Test and lint
     runs-on: ubuntu-latest
     steps:
-      - uses: navikt/teamesyfo-github-actions-workflows/actions/setup-pnpm@feat/pnpm-next-workflow
+      - uses: navikt/teamesyfo-github-actions-workflows/actions/setup-pnpm@main
         with:
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           node-version: ${{ inputs.node-version }}
@@ -34,7 +34,7 @@ jobs:
 
       - name: Run Playwright E2E tests
         if: inputs.e2e-test-framework == 'playwright'
-        uses: navikt/teamesyfo-github-actions-workflows/actions/playwright-e2e@feat/pnpm-next-workflow
+        uses: navikt/teamesyfo-github-actions-workflows/actions/playwright-e2e@main
         with:
           package-manager: pnpm
 
@@ -50,7 +50,7 @@ jobs:
     outputs:
       image: ${{ steps.build-and-publish.outputs.image }}
     steps:
-      - uses: navikt/teamesyfo-github-actions-workflows/actions/build-next-app@feat/pnpm-next-workflow
+      - uses: navikt/teamesyfo-github-actions-workflows/actions/build-next-app@main
         id: build-and-publish
         with:
           app: ${{ inputs.app }}
@@ -70,7 +70,7 @@ jobs:
     outputs:
       image: ${{ steps.build-and-publish.outputs.image }}
     steps:
-      - uses: navikt/teamesyfo-github-actions-workflows/actions/build-next-app@feat/pnpm-next-workflow
+      - uses: navikt/teamesyfo-github-actions-workflows/actions/build-next-app@main
         id: build-and-publish
         with:
           app: ${{ inputs.app }}
@@ -90,7 +90,7 @@ jobs:
     outputs:
       image: ${{ steps.build-and-publish.outputs.image }}
     steps:
-      - uses: navikt/teamesyfo-github-actions-workflows/actions/build-next-app@feat/pnpm-next-workflow
+      - uses: navikt/teamesyfo-github-actions-workflows/actions/build-next-app@main
         id: build-and-publish
         with:
           app: ${{ inputs.app }}

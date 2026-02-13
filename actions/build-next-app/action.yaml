@@ -23,7 +23,7 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - uses: navikt/teamesyfo-github-actions-workflows/actions/setup-pnpm@feat/pnpm-next-workflow
+    - uses: navikt/teamesyfo-github-actions-workflows/actions/setup-pnpm@main
       with:
         NPM_AUTH_TOKEN: ${{ inputs.NPM_AUTH_TOKEN }}
         node-version: ${{ inputs.node-version }}
