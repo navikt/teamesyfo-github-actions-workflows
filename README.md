@@ -97,7 +97,7 @@ jobs:
 
 #### 2. The naiserator files must be in the `nais` folder, named `nais-dev.yaml` and `nais-prod.yaml`.
 
-### Auto-merging Dependabot PRs (dependabot-automerge.yml)
+### Auto-merging Dependabot PRs (dependabot-automerge.yaml)
 
 Auto-approves and enables auto-merge for safe Dependabot PRs (patch and minor updates). Major updates are left for manual review.
 
@@ -114,7 +114,7 @@ Uses `gh pr merge --auto --squash`, which means GitHub will only merge when bran
 
 #### Setup
 
-Add a workflow file (e.g. `.github/workflows/dependabot-automerge.yml`):
+Add a workflow file (e.g. `.github/workflows/dependabot-automerge.yaml`):
 
 ```yaml
 name: Dependabot auto-merge
@@ -128,7 +128,7 @@ jobs:
       contents: write
       pull-requests: write
     # Prefer pinning to a tag/SHA; @main is easier but less controlled.
-    uses: navikt/teamesyfo-github-actions-workflows/.github/workflows/dependabot-automerge.yml@efe0ae8f5d3627f70e0a6c3461d2af9ca85d3a0a
+    uses: navikt/teamesyfo-github-actions-workflows/.github/workflows/dependabot-automerge.yaml@main
 ```
 
 No secrets need to be passed — the workflow uses `GITHUB_TOKEN`, but the caller must grant the write permissions shown above.

@@ -26,9 +26,9 @@ jobs:
     steps:
       - name: Fetch Dependabot metadata
         id: dependabot-metadata
-        uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a
+        uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a # v2.5.0
 
-      - name: Decide policy
+      - name: Decide auto-merge policy
         id: policy
         shell: bash
         run: |
@@ -44,7 +44,7 @@ jobs:
             echo "should_automerge=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Approve PR
+      - name: Approve PR if safe
         if: ${{ steps.policy.outputs.should_automerge == 'true' }}
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
@@ -58,7 +58,7 @@ jobs:
             echo "PR already approved."
           fi
 
-      - name: Enable auto-merge (squash)
+      - name: Enable auto-merge if safe
         if: ${{ steps.policy.outputs.should_automerge == 'true' }}
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
