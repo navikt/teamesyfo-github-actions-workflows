@@ -12,16 +12,16 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - uses: actions/checkout@v6
-    - uses: pnpm/action-setup@v4
-    - uses: actions/setup-node@v6
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+    - uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c # v4
+    - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
       with:
         node-version: ${{ inputs.node-version }}
         cache: pnpm
     - name: Set NPM_AUTH_TOKEN
       shell: bash
       run: echo "NPM_AUTH_TOKEN=${{ inputs.NPM_AUTH_TOKEN }}" >> $GITHUB_ENV
-    - uses: actions/cache@v5
+    - uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
       with:
         path: |
           ${{ github.workspace }}/.next/cache
