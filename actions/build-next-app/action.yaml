@@ -1,0 +1,61 @@
+name: "Build Next.js app and push to Docker"
+description: "Builds a Next.js App with pnpm, creates a docker image and uploads it to GAR"
+
+inputs:
+  app:
+    description: "Application name"
+    required: true
+  env:
+    description: "Environment name"
+    required: true
+  NPM_AUTH_TOKEN:
+    description: "NPM authentication token"
+    required: true
+  node-version:
+    description: "Node version"
+    required: true
+
+outputs:
+  image:
+    description: "Docker image in GAR"
+    value: ${{ steps.docker-build-push.outputs.image }}
+
+runs:
+  using: "composite"
+  steps:
+    - uses: navikt/teamesyfo-github-actions-workflows/actions/setup-pnpm@main
+      with:
+        NPM_AUTH_TOKEN: ${{ inputs.NPM_AUTH_TOKEN }}
+        node-version: ${{ inputs.node-version }}
+    - name: Cache Next.js build
+      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
+      with:
+        path: |
+          ${{ github.workspace }}/.next/cache
+        key: ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/*.[jt]s', '**/*.[jt]sx', '**/*.json', 'next.config.*') }}
+        restore-keys: |
+          ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
+    - name: Copy appropriate env file to root
+      shell: bash
+      run: |
+        echo "Copying nais/envs/.env.${{ inputs.env }}..."
+        cp nais/envs/.env.${{ inputs.env }} .env.production
+    - name: Build application
+      shell: bash
+      run: pnpm run build
+      env:
+        NEXT_PUBLIC_VERSION: ${{ github.sha }}
+    - name: Upload static files to NAV CDN
+      uses: nais/deploy/actions/cdn-upload/v2@fa754451577294aae42872a69b888b3470478ec1 # v2 (master)
+      if: ${{ github.actor != 'dependabot[bot]' }}
+      with:
+        team: team-esyfo
+        source: ./.next/static
+        destination: "/${{ inputs.app }}/_next"
+    - name: Push docker image to GAR
+      uses: nais/docker-build-push@87f920b0411b987d9a1fd4113aa384e1e3b54f2c # v0
+      if: ${{ github.actor != 'dependabot[bot]' }}
+      id: docker-build-push
+      with:
+        team: team-esyfo
+        image_suffix: ${{ inputs.env }}

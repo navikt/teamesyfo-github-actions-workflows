@@ -1,0 +1,26 @@
+name: "Setup pnpm"
+description: "Sets up pnpm, Node.js, and installs dependencies with caching"
+
+inputs:
+  NPM_AUTH_TOKEN:
+    description: "GitHub token for npm authentication"
+    required: true
+  node-version:
+    description: "Node.js version to use"
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+    - uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c # v4
+    - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: pnpm
+    - name: Set NPM_AUTH_TOKEN
+      shell: bash
+      run: echo "NPM_AUTH_TOKEN=${{ inputs.NPM_AUTH_TOKEN }}" >> $GITHUB_ENV
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile
