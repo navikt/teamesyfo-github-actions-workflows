@@ -101,7 +101,7 @@ jobs:
           node-version: ${{ inputs.node-version }}
 
   deploy-dev:
-    if: ${{ !startsWith(github.ref_name, 'demo') && github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false }}
+    if: ${{ github.event_name != 'merge_group' && !startsWith(github.ref_name, 'demo') && github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false }}
     name: Deploy to dev
     environment:
       name: development
@@ -121,7 +121,7 @@ jobs:
           VAR: image=${{ needs.build-dev.outputs.image }},version=${{ github.sha }}
 
   deploy-demo-main:
-    if: github.ref_name == 'main'
+    if: github.event_name != 'merge_group' && github.ref_name == 'main'
     name: Deploy main to demo
     environment:
       name: demo-main
@@ -137,7 +137,7 @@ jobs:
           VAR: image=${{ needs.build-demo.outputs.image }},ingress=https://demo.ekstern.dev.nav.no${{ inputs.base-path }},appname=${{ inputs.app }},replicas=1,branchState=alive
 
   deploy-demo-branch:
-    if: startsWith(github.ref_name, 'demo')
+    if: github.event_name != 'merge_group' && startsWith(github.ref_name, 'demo')
     name: Deploy branch to demo
     environment:
       name: demo-branch
@@ -157,7 +157,7 @@ jobs:
           VAR: image=${{ needs.build-demo.outputs.image }},ingress=https://${{ steps.slug.outputs.slug }}.ekstern.dev.nav.no${{ inputs.base-path }},appname=${{ steps.slug.outputs.slug }},replicas=1,branchState=alive,ttl=48h
 
   deploy-prod:
-    if: github.ref_name == 'main'
+    if: github.event_name != 'merge_group' && github.ref_name == 'main'
     name: Deploy to prod
     environment:
       name: production
