@@ -62,7 +62,8 @@ jobs:
         if: ${{ steps.policy.outputs.should_automerge == 'true' }}
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_SHA: ${{ github.event.pull_request.head.sha }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh pr merge --auto --squash "$PR_URL"
+          gh pr merge --auto --squash --match-head-commit "$PR_SHA" "$PR_URL"
