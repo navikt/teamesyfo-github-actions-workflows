@@ -8,9 +8,21 @@ name: Dependabot auto-approve and auto-merge
 #   - Branch protection with required status checks (e.g. a CI merge gate)
 #     on the default branch. Without required checks, PRs may merge immediately.
 #   - "Allow auto-merge" must be enabled in the repo settings.
+#
+# Secrets:
+#   APP_PRIVATE_KEY – GitHub App private key (.pem contents) for the
+#     teamesyfo-automerge App (ID 2906300). The App must be installed on
+#     the calling repo with permissions: contents:write + pull-requests:write.
+#
+#   A short-lived installation token is generated at runtime; this avoids
+#   the GITHUB_TOKEN limitation that blocks merge_group event triggering.
 
 on:
   workflow_call:
+    secrets:
+      APP_PRIVATE_KEY:
+        description: "GitHub App private key (.pem) for teamesyfo-automerge. Required to generate short-lived tokens that can trigger merge_group events."
+        required: true
 
 jobs:
   dependabot:
@@ -24,6 +36,13 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: 2906300 # teamesyfo-automerge
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - name: Fetch Dependabot metadata
         id: dependabot-metadata
         uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a # v2.5.0
@@ -62,8 +81,9 @@ jobs:
         if: ${{ steps.policy.outputs.should_automerge == 'true' }}
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          PR_SHA: ${{ github.event.pull_request.head.sha }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Use GitHub App token to enable auto-merge.
+          # GITHUB_TOKEN cannot trigger merge_group events.
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
-          gh pr merge --auto --squash --match-head-commit "$PR_SHA" "$PR_URL"
+          gh pr merge --auto --squash "$PR_URL"
