@@ -2,30 +2,10 @@ version: 2
 
 updates:
   - package-ecosystem: github-actions
-    directory: "/"
+    directories:
+      - "/"
+      - "/actions/*"
     schedule:
       interval: daily
-  - package-ecosystem: github-actions
-    directory: "/actions/boot-jar-to-docker"
-    schedule:
-      interval: daily
-  - package-ecosystem: github-actions
-    directory: "/actions/gradle-cached"
-    schedule:
-      interval: daily
-  - package-ecosystem: github-actions
-    directory: "/actions/gradle-cached-21"
-    schedule:
-      interval: daily
-  - package-ecosystem: github-actions
-    directory: "/actions/jar-to-docker"
-    schedule:
-      interval: daily
-  - package-ecosystem: github-actions
-    directory: "/actions/next-to-docker"
-    schedule:
-      interval: daily
-  - package-ecosystem: github-actions
-    directory: "/actions/npm-cached"
-    schedule:
-      interval: daily
+    cooldown:
+      default-days: 7

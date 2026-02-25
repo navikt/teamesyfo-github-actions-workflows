@@ -27,8 +27,8 @@ jobs:
       packages: write
 
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
         with:
           node-version: ${{ inputs.node-version }}
           registry-url: https://npm.pkg.github.com
@@ -44,7 +44,7 @@ jobs:
 
       - name: cdn-upload
         id: cdn-upload
-        uses: nais/deploy/actions/cdn-upload/v2@master
+        uses: nais/deploy/actions/cdn-upload/v2@fa754451577294aae42872a69b888b3470478ec1 # v2
         if: ${{ github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false }}
         with:
           team: team-esyfo
@@ -61,7 +61,7 @@ jobs:
 
       - name: Build and push docker image
         if: ${{ github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false }}
-        uses: nais/docker-build-push@v0
+        uses: nais/docker-build-push@87f920b0411b987d9a1fd4113aa384e1e3b54f2c # v0
         id: docker-build-push
         with:
           team: team-esyfo
@@ -69,7 +69,7 @@ jobs:
   update-manifest-dev:
     if: ${{ github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false }}
     needs: build
-    uses: navikt/tms-deploy/.github/workflows/oppdater-mikrofrontend-manifest-v2.yaml@main
+    uses: navikt/tms-deploy/.github/workflows/oppdater-mikrofrontend-manifest-v2.yaml@67dc876fb9e1a0b115e47a36fd46a1c7b0064d4c # main
     with:
       cluster: dev-gcp
       id: ${{ inputs.id }}
@@ -79,7 +79,7 @@ jobs:
   update-manifest-prod:
     if: github.ref == 'refs/heads/main'
     needs: build
-    uses: navikt/tms-deploy/.github/workflows/oppdater-mikrofrontend-manifest-v2.yaml@main
+    uses: navikt/tms-deploy/.github/workflows/oppdater-mikrofrontend-manifest-v2.yaml@67dc876fb9e1a0b115e47a36fd46a1c7b0064d4c # main
     with:
       cluster: prod-gcp
       id: ${{ inputs.id }}
