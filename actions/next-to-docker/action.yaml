@@ -37,7 +37,7 @@ runs:
       env:
         NEXT_PUBLIC_VERSION: ${{ github.sha }}
     - name: Upload static files to NAV CDN
-      uses: nais/deploy/actions/cdn-upload/v2@master
+      uses: nais/deploy/actions/cdn-upload/v2@fa754451577294aae42872a69b888b3470478ec1 # v2
       if: ${{ github.actor != 'dependabot[bot]' }}
       with:
         team: team-esyfo
@@ -46,7 +46,7 @@ runs:
         identity_provider: ${{ inputs.identity_provider }}
         project_id: ${{ inputs.project_id }}
     - name: Push docker image to GAR
-      uses: nais/docker-build-push@v0
+      uses: nais/docker-build-push@87f920b0411b987d9a1fd4113aa384e1e3b54f2c # v0
       if: ${{ github.actor != 'dependabot[bot]' }}
       id: docker-build-push
       with:
