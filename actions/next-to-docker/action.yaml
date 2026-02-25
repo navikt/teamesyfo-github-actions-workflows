@@ -4,16 +4,16 @@ description: "Builds a Next.JS App, creates a docker image and uploads it to GAR
 inputs:
   app:
     required: true
-    type: string
+    description: "Application name"
   env:
     required: true
-    type: string
+    description: "Environment name"
   NPM_AUTH_TOKEN:
     required: true
-    type: string
+    description: "NPM authentication token"
   node-version:
     required: false
-    type: string
+    description: "Node version"
 outputs:
   image:
     description: "Docker image in GAR"
