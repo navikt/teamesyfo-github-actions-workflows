@@ -47,7 +47,7 @@ jobs:
     outputs:
       image: ${{ steps.build-and-publish.outputs.image }}
     steps:
-      - uses: navikt/teamesyfo-github-actions-workflows/actions/next-to-docker@main
+      - uses: navikt/teamesyfo-github-actions-workflows/actions/next-to-docker@bump-sha-docker-build-push
         id: build-and-publish
         with:
           app: ${{ inputs.app }}
@@ -87,7 +87,7 @@ jobs:
     outputs:
       image: ${{ steps.build-and-publish.outputs.image }}
     steps:
-      - uses: navikt/teamesyfo-github-actions-workflows/actions/next-to-docker@main
+      - uses: navikt/teamesyfo-github-actions-workflows/actions/next-to-docker@bump-sha-docker-build-push
         id: build-and-publish
         with:
           app: ${{ inputs.app }}
@@ -143,7 +143,7 @@ jobs:
     outputs:
       image: ${{ steps.build-and-publish.outputs.image }}
     steps:
-      - uses: navikt/teamesyfo-github-actions-workflows/actions/next-to-docker@main
+      - uses: navikt/teamesyfo-github-actions-workflows/actions/next-to-docker@bump-sha-docker-build-push
         id: build-and-publish
         with:
           app: ${{ inputs.app }}
