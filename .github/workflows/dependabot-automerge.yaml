@@ -1,8 +1,10 @@
 name: Dependabot auto-approve and auto-merge
 
-# Reusable workflow that auto-approves and enables auto-merge for safe
-# Dependabot PRs (patch and minor updates). Major updates are left for
-# manual review.
+# Reusable workflow that auto-approves and enables auto-merge for
+# Dependabot PRs. GitHub Actions updates are always automerged (including
+# major), while other ecosystems (npm, Maven, etc.) are limited to
+# patch and minor updates. Required status checks (CI) act as the
+# safety gate.
 #
 # Prerequisites (recommended):
 #   - Branch protection with required status checks (e.g. a CI merge gate)
@@ -53,17 +55,23 @@ jobs:
         run: |
           set -euo pipefail
 
+          ecosystem='${{ steps.dependabot-metadata.outputs.package-ecosystem }}'
           update_type='${{ steps.dependabot-metadata.outputs.update-type }}'
+          echo "Package ecosystem: $ecosystem"
           echo "Update type: $update_type"
 
-          if [[ "$update_type" == "version-update:semver-patch" || "$update_type" == "version-update:semver-minor" ]]; then
+          if [[ "$ecosystem" == "github_actions" ]]; then
+            echo "GitHub Actions update — always auto-merge."
+            echo "should_automerge=true" >> "$GITHUB_OUTPUT"
+          elif [[ "$update_type" == "version-update:semver-patch" || "$update_type" == "version-update:semver-minor" ]]; then
+            echo "Patch/minor update — auto-merge."
             echo "should_automerge=true" >> "$GITHUB_OUTPUT"
           else
-            echo "Major or unknown update — skipping auto-merge."
+            echo "Major non-Actions update — skipping auto-merge."
             echo "should_automerge=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Approve PR if safe
+      - name: Approve PR
         if: ${{ steps.policy.outputs.should_automerge == 'true' }}
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
@@ -72,12 +80,12 @@ jobs:
           set -euo pipefail
           decision="$(gh pr view "$PR_URL" --json reviewDecision -q .reviewDecision)"
           if [[ "$decision" != "APPROVED" ]]; then
-            gh pr review --approve "$PR_URL" -b "Auto-approving safe Dependabot update (patch/minor)."
+            gh pr review --approve "$PR_URL" -b "Auto-approving Dependabot ${{ steps.dependabot-metadata.outputs.package-ecosystem }} ${{ steps.dependabot-metadata.outputs.update-type }} update."
           else
             echo "PR already approved."
           fi
 
-      - name: Enable auto-merge if safe
+      - name: Enable auto-merge
         if: ${{ steps.policy.outputs.should_automerge == 'true' }}
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
