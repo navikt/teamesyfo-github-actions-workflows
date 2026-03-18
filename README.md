@@ -114,7 +114,7 @@ See [docs/dependabot-automerge.md](docs/dependabot-automerge.md) for the full se
 2. Add the app private key as a GitHub **Dependabot secret** in the consumer repo (for example `AUTOMERGE_APP_PRIVATE_KEY`).
 3. Enable **Allow auto-merge** in the repository settings (Settings → General → Pull Requests).
 4. Enable **Allow GitHub Actions to create and approve pull requests** in the repository settings (Settings → Actions → General → Workflow permissions). Workflow permissions must be set to **Read and write permissions**.
-5. Configure at least one required CI check on the default branch. If the repository uses **merge queue**, the required workflow must also trigger on `merge_group`.
+5. Configure at least one required CI check on the default branch through branch protection or rulesets. If the repository uses **merge queue** (the expected setup for Team eSyfo repos), the required workflow must also trigger on `merge_group`.
 
 #### Setup
 
@@ -138,7 +138,7 @@ jobs:
 
 `AUTOMERGE_APP_PRIVATE_KEY` must be stored as a GitHub **Dependabot secret**. On Dependabot-triggered runs, regular Actions secrets are not available, so a normal repository secret is not enough.
 
-The reusable workflow uses `GITHUB_TOKEN` to approve the PR, then creates a short-lived GitHub App token from `APP_PRIVATE_KEY` to enable auto-merge. This is needed because `GITHUB_TOKEN` cannot trigger `merge_group` validations.
+The current implementation uses `GITHUB_TOKEN` to approve the PR, then creates a short-lived GitHub App token from `APP_PRIVATE_KEY` to enable auto-merge. The GitHub App token is what avoids the `GITHUB_TOKEN` limitation around `merge_group` validations.
 
 #### Policy
 

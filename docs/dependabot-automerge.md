@@ -23,15 +23,15 @@ flowchart TD
 
 ## What the reusable workflow does
 
-The reusable workflow:
+The reusable workflow currently:
 
 1. Verifies that the PR author is `dependabot[bot]` and that the PR does not come from a fork.
 2. Reads Dependabot metadata to determine ecosystem and update type.
 3. Approves eligible PRs with `GITHUB_TOKEN`.
 4. Creates a short-lived GitHub App token from `APP_PRIVATE_KEY`.
-5. Enables auto-merge with `gh pr merge --auto --squash`.
+5. Enables auto-merge with `gh pr merge --auto --squash` using the GitHub App token.
 
-The GitHub App token is important when the consumer repository uses merge queue. `GITHUB_TOKEN` can approve the PR, but it cannot trigger the `merge_group` validations needed by merge queue.
+This wording matches the workflow implementation as it exists today: the approval step uses `GITHUB_TOKEN`, while the merge step uses the GitHub App token. The GitHub App token is important when the consumer repository uses merge queue, because `GITHUB_TOKEN` cannot trigger the `merge_group` validations needed by merge queue.
 
 ## Prerequisites in the consumer repo
 
@@ -64,11 +64,13 @@ Enable the following settings in the consumer repository:
 - **Read and write permissions** for workflows in Settings -> Actions -> General
 - **Allow GitHub Actions to create and approve pull requests** in Settings -> Actions -> General
 
-### 4. Required CI checks
+### 4. Required CI checks and merge queue
 
 The repository should require at least one CI check on the default branch. Without required checks, Dependabot PRs may merge immediately after the workflow enables auto-merge.
 
-If the repository uses **merge queue**, the required CI workflow must also run on `merge_group`.
+GitHub auto-merge does not strictly require merge queue. It can also work with ordinary branch protection or rulesets plus required checks.
+
+For Team eSyfo repositories, though, merge queue should be treated as the expected setup. If the repository uses **merge queue**, the required CI workflow must also run on `merge_group`.
 
 ## Caller workflow example
 
