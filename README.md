@@ -99,26 +99,29 @@ jobs:
 
 ### Auto-merging Dependabot PRs (dependabot-automerge.yaml)
 
-Auto-approves and enables auto-merge for safe Dependabot PRs (patch and minor updates). Major updates are left for manual review.
+Auto-approves and enables auto-merge for safe Dependabot PRs. GitHub Actions updates are always auto-merged (including major), while other ecosystems are limited to patch and minor updates.
 
-Uses `gh pr merge --auto --squash`, which means GitHub will only merge when branch protection requirements are satisfied (required checks/reviews, if configured). **If you do not have required checks configured, the PR may merge immediately after this workflow runs.**
+Uses `gh pr merge --auto --squash`, which means GitHub will only merge when branch protection or ruleset requirements are satisfied. **If you do not have required checks configured, the PR may merge immediately after this workflow runs.**
+
+See [docs/dependabot-automerge.md](docs/dependabot-automerge.md) for the full setup, a Mermaid flow diagram, and troubleshooting tips.
 
 <details>
-<summary>Detailed instructions</summary>
+<summary>Quick start</summary>
 
 #### Prerequisites
 
-1. **Branch protection** should be enabled on the default branch with at least one required status check (e.g. a CI "Merge gate" job). Without required checks, Dependabot PRs can merge without running CI.
-2. **"Allow auto-merge"** must be enabled in the repository settings (Settings → General → Pull Requests).
-3. **Allow GitHub Actions to create and approve pull requests** must be enabled in the repository settings (Settings → Actions → General → Workflow permissions), and workflow permissions must be set to **Read and write permissions** so that `GITHUB_TOKEN` can approve and merge Dependabot PRs.
-4. If the repository uses **merge queue**, required CI workflows should also trigger on `merge_group` so queue validations can run.
+1. Grant the [`teamesyfo-automerge`](https://github.com/apps/teamesyfo-automerge) GitHub App repository access to the consumer repo.
+2. Add the app private key as a GitHub **Dependabot secret** in the consumer repo (for example `AUTOMERGE_APP_PRIVATE_KEY`).
+3. Enable **Allow auto-merge** in the repository settings (Settings → General → Pull Requests).
+4. Enable **Allow GitHub Actions to create and approve pull requests** in the repository settings (Settings → Actions → General → Workflow permissions). Workflow permissions must be set to **Read and write permissions**.
+5. Configure at least one required CI check on the default branch through branch protection or rulesets. If the repository uses **merge queue** (the expected setup for Team eSyfo repos), the required workflow must also trigger on `merge_group`.
 
 #### Setup
 
 Add a workflow file (e.g. `.github/workflows/dependabot-automerge.yaml`):
 
 ```yaml
-name: Dependabot auto-merge
+name: Dependabot auto-approve and auto-merge
 on:
   pull_request:
     types: [opened, reopened, synchronize]
@@ -129,19 +132,24 @@ jobs:
       contents: write
       pull-requests: write
     uses: navikt/teamesyfo-github-actions-workflows/.github/workflows/dependabot-automerge.yaml@main
+    secrets:
+      APP_PRIVATE_KEY: ${{ secrets.AUTOMERGE_APP_PRIVATE_KEY }}
 ```
 
-No secrets need to be passed — the workflow uses `GITHUB_TOKEN`, but the caller must grant the write permissions shown above.
+`AUTOMERGE_APP_PRIVATE_KEY` must be stored as a GitHub **Dependabot secret**. On Dependabot-triggered runs, regular Actions secrets are not available, so a normal repository secret is not enough.
+
+The current implementation uses `GITHUB_TOKEN` to approve the PR, then creates a short-lived GitHub App token from `APP_PRIVATE_KEY` to enable auto-merge. The GitHub App token is what avoids the `GITHUB_TOKEN` limitation around `merge_group` validations.
 
 #### Policy
 
 | Update type | Auto-merged? |
 |-------------|-------------|
-| Patch       | ✅ Yes       |
-| Minor       | ✅ Yes       |
-| Major       | ❌ No — requires manual review |
+| GitHub Actions | ✅ Yes, including major |
+| Patch (non-GitHub Actions) | ✅ Yes |
+| Minor (non-GitHub Actions) | ✅ Yes |
+| Major (non-GitHub Actions) | ❌ No — requires manual review |
 
-The policy applies equally to all ecosystems (npm, gradle, github-actions) and all dependency types (production and development).
+The policy applies to both production and development dependencies.
 
 </details>
 
