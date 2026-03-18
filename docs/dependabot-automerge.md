@@ -7,13 +7,13 @@ This document explains how to use `dependabot-automerge.yaml` from `navikt/teame
 ```mermaid
 flowchart TD
     A[Dependabot opens or updates a PR] --> B[Consumer repo triggers caller workflow on pull_request]
-    B --> C[Reusable workflow fetches Dependabot metadata]
-    C --> D{Should this PR be auto-merged?}
-    D -->|GitHub Actions update| E[Approve PR with GITHUB_TOKEN]
-    D -->|Patch or minor update| E
-    D -->|Major non-GitHub-Actions update| F[Leave PR for manual review]
-    E --> G[Create GitHub App token from APP_PRIVATE_KEY]
-    G --> H[Enable auto-merge with gh pr merge --auto --squash]
+    B --> C[Generate GitHub App token from APP_PRIVATE_KEY]
+    C --> D[Fetch Dependabot metadata]
+    D --> E{Should this PR be auto-merged?}
+    E -->|GitHub Actions update| F[Approve PR with GITHUB_TOKEN]
+    E -->|Patch or minor update| F
+    E -->|Major non-GitHub-Actions update| G[Leave PR for manual review]
+    F --> H[Enable auto-merge with GitHub App token]
     H --> I{Merge queue enabled?}
     I -->|Yes| J[GitHub creates merge_group and runs required checks]
     I -->|No| K[GitHub merges when branch requirements are satisfied]
@@ -26,12 +26,12 @@ flowchart TD
 The reusable workflow currently:
 
 1. Verifies that the PR author is `dependabot[bot]` and that the PR does not come from a fork.
-2. Reads Dependabot metadata to determine ecosystem and update type.
-3. Approves eligible PRs with `GITHUB_TOKEN`.
-4. Creates a short-lived GitHub App token from `APP_PRIVATE_KEY`.
+2. Creates a short-lived GitHub App token from `APP_PRIVATE_KEY` (this happens first, for all eligible Dependabot PRs).
+3. Reads Dependabot metadata to determine ecosystem and update type.
+4. Approves eligible PRs with `GITHUB_TOKEN`.
 5. Enables auto-merge with `gh pr merge --auto --squash` using the GitHub App token.
 
-This wording matches the workflow implementation as it exists today: the approval step uses `GITHUB_TOKEN`, while the merge step uses the GitHub App token. The GitHub App token is important when the consumer repository uses merge queue, because `GITHUB_TOKEN` cannot trigger the `merge_group` validations needed by merge queue.
+The approval step uses `GITHUB_TOKEN`, while the merge step uses the GitHub App token. The GitHub App token is needed because `GITHUB_TOKEN` cannot trigger the `merge_group` validations required by merge queue.
 
 ## Prerequisites in the consumer repo
 
