@@ -100,6 +100,42 @@ jobs:
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           node-version: ${{ inputs.node-version }}
 
+  merge-gate:
+    name: Merge gate
+    needs: [test-and-verify, build-dev, build-demo, build-prod]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check required jobs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Single required check for branch protection.
+          # Accept "skipped" for conditionally-run jobs (e.g. build-prod only on main).
+          results=(
+            "test-and-verify=${{ needs.test-and-verify.result }}"
+            "build-dev=${{ needs.build-dev.result }}"
+            "build-demo=${{ needs.build-demo.result }}"
+            "build-prod=${{ needs.build-prod.result }}"
+          )
+          printf '%s\n' "${results[@]}"
+
+          for r in "${results[@]}"; do
+            status="${r#*=}"
+            case "$status" in
+              success|skipped) ;;
+              cancelled)
+                echo "::error::Required job was cancelled: $r"
+                exit 1
+                ;;
+              *)
+                echo "::error::Required job failed: $r"
+                exit 1
+                ;;
+            esac
+          done
+
   deploy-dev:
     if: ${{ github.event_name != 'merge_group' && !startsWith(github.ref_name, 'demo') && github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false }}
     name: Deploy to dev
