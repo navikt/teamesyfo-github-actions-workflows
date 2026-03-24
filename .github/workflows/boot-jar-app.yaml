@@ -72,6 +72,41 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           java-version: ${{inputs.java-version}}
 
+  merge-gate:
+    name: Merge gate
+    needs: [analyze, test, build]
+    runs-on: ubuntu-latest
+    permissions: {}
+    if: always()
+    steps:
+      - name: Check required jobs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Single required check for branch protection.
+          results=(
+            "analyze=${{ needs.analyze.result }}"
+            "test=${{ needs.test.result }}"
+            "build=${{ needs.build.result }}"
+          )
+          printf '%s\n' "${results[@]}"
+
+          for r in "${results[@]}"; do
+            status="${r#*=}"
+            case "$status" in
+              success) ;;
+              cancelled)
+                echo "::error::Required job was cancelled: $r"
+                exit 1
+                ;;
+              *)
+                echo "::error::Required job failed: $r"
+                exit 1
+                ;;
+            esac
+          done
+
   deploy-dev:
     if: ${{ github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false }}
     name: Deploy to dev
