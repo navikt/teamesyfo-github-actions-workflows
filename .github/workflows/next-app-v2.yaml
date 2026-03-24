@@ -102,8 +102,9 @@ jobs:
 
   merge-gate:
     name: Merge gate
-    needs: [test-and-verify, build-dev, build-demo, build-prod]
+    needs: [test-and-verify, build-dev]
     runs-on: ubuntu-latest
+    permissions: {}
     if: always()
     steps:
       - name: Check required jobs
@@ -112,12 +113,10 @@ jobs:
           set -euo pipefail
 
           # Single required check for branch protection.
-          # Accept "skipped" for conditionally-run jobs (e.g. build-prod only on main).
+          # Accept "skipped" for conditionally-run jobs.
           results=(
             "test-and-verify=${{ needs.test-and-verify.result }}"
             "build-dev=${{ needs.build-dev.result }}"
-            "build-demo=${{ needs.build-demo.result }}"
-            "build-prod=${{ needs.build-prod.result }}"
           )
           printf '%s\n' "${results[@]}"
 

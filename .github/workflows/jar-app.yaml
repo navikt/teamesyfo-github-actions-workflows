@@ -71,6 +71,7 @@ jobs:
     name: Merge gate
     needs: [analyze, test, build]
     runs-on: ubuntu-latest
+    permissions: {}
     if: always()
     steps:
       - name: Check required jobs
@@ -79,7 +80,6 @@ jobs:
           set -euo pipefail
 
           # Single required check for branch protection.
-          # Accept "skipped" for conditionally-run jobs.
           results=(
             "analyze=${{ needs.analyze.result }}"
             "test=${{ needs.test.result }}"
@@ -90,7 +90,7 @@ jobs:
           for r in "${results[@]}"; do
             status="${r#*=}"
             case "$status" in
-              success|skipped) ;;
+              success) ;;
               cancelled)
                 echo "::error::Required job was cancelled: $r"
                 exit 1
