@@ -44,13 +44,14 @@ jobs:
           category: "/language:${{matrix.language}}"
 
   test:
-    name: Test
+    name: Check lint and test
     runs-on: ubuntu-latest
     steps:
       - uses: navikt/teamesyfo-github-actions-workflows/actions/gradle-cached@main
         with:
           java-version: ${{inputs.java-version}}
-      - run: ./gradlew test
+      - name: Run Gradle check (lint and test)
+        run: ./gradlew check
         env:
           ORG_GRADLE_PROJECT_githubUser: x-access-token
           ORG_GRADLE_PROJECT_githubPassword: ${{ secrets.GITHUB_TOKEN }}
