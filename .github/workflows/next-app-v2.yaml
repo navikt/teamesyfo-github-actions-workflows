@@ -100,6 +100,41 @@ jobs:
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           node-version: ${{ inputs.node-version }}
 
+  merge-gate:
+    name: Merge gate
+    needs: [test-and-verify, build-dev]
+    runs-on: ubuntu-latest
+    permissions: {}
+    if: always()
+    steps:
+      - name: Check required jobs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Single required check for branch protection.
+          # Accept "skipped" for conditionally-run jobs.
+          results=(
+            "test-and-verify=${{ needs.test-and-verify.result }}"
+            "build-dev=${{ needs.build-dev.result }}"
+          )
+          printf '%s\n' "${results[@]}"
+
+          for r in "${results[@]}"; do
+            status="${r#*=}"
+            case "$status" in
+              success|skipped) ;;
+              cancelled)
+                echo "::error::Required job was cancelled: $r"
+                exit 1
+                ;;
+              *)
+                echo "::error::Required job failed: $r"
+                exit 1
+                ;;
+            esac
+          done
+
   deploy-dev:
     if: ${{ github.event_name != 'merge_group' && !startsWith(github.ref_name, 'demo') && github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false }}
     name: Deploy to dev
@@ -111,7 +146,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - id: get-ingress
-        uses: mikefarah/yq@5a7e72a743649b1b3a47d1a1d8214f3453173c51 # v4.52.4
+        uses: mikefarah/yq@0f4fb8d35ec1a939d78dd6862f494d19ec589f19 # v4.52.5
         with:
           cmd: yq '.spec.ingresses[0]' nais/nais-dev.yaml
       - uses: nais/deploy/actions/deploy@fa754451577294aae42872a69b888b3470478ec1 # v2
@@ -167,7 +202,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - id: get-ingress
-        uses: mikefarah/yq@5a7e72a743649b1b3a47d1a1d8214f3453173c51 # v4.52.4
+        uses: mikefarah/yq@0f4fb8d35ec1a939d78dd6862f494d19ec589f19 # v4.52.5
         with:
           cmd: yq '.spec.ingresses[0]' nais/nais-prod.yaml
       - uses: nais/deploy/actions/deploy@fa754451577294aae42872a69b888b3470478ec1 # v2

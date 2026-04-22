@@ -20,7 +20,7 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-      - uses: github/codeql-action/init@0d579ffd059c29b07949a3cce3983f0780820c98 # v4
+      - uses: github/codeql-action/init@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4
         with:
           languages: kotlin
           tools: linked
@@ -34,7 +34,7 @@ jobs:
           JAVA_OPTS: "-Xmx2g -XX:MaxMetaspaceSize=1g"
           ORG_GRADLE_PROJECT_githubUser: x-access-token
           ORG_GRADLE_PROJECT_githubPassword: ${{ secrets.GITHUB_TOKEN }}
-      - uses: github/codeql-action/analyze@0d579ffd059c29b07949a3cce3983f0780820c98 # v4
+      - uses: github/codeql-action/analyze@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4
         with:
           category: "/language:kotlin"
 
@@ -66,6 +66,41 @@ jobs:
           app: ${{ inputs.app }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           java-version: ${{ inputs.java-version }}
+
+  merge-gate:
+    name: Merge gate
+    needs: [analyze, test, build]
+    runs-on: ubuntu-latest
+    permissions: {}
+    if: always()
+    steps:
+      - name: Check required jobs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Single required check for branch protection.
+          results=(
+            "analyze=${{ needs.analyze.result }}"
+            "test=${{ needs.test.result }}"
+            "build=${{ needs.build.result }}"
+          )
+          printf '%s\n' "${results[@]}"
+
+          for r in "${results[@]}"; do
+            status="${r#*=}"
+            case "$status" in
+              success) ;;
+              cancelled)
+                echo "::error::Required job was cancelled: $r"
+                exit 1
+                ;;
+              *)
+                echo "::error::Required job failed: $r"
+                exit 1
+                ;;
+            esac
+          done
 
   deploy-dev:
     if: ${{ github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false }}
