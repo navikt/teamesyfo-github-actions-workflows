@@ -45,6 +45,7 @@ runs:
       run: pnpm run build
       env:
         NEXT_PUBLIC_VERSION: ${{ github.sha }}
+        NEXT_DEPLOYMENT_ID: ${{ github.sha }}
     - name: Upload static files to NAV CDN
       uses: nais/deploy/actions/cdn-upload/v2@fa754451577294aae42872a69b888b3470478ec1 # v2 (master)
       if: ${{ github.actor != 'dependabot[bot]' }}
