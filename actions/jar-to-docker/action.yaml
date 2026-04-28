@@ -32,7 +32,7 @@ runs:
       run: |
         ./gradlew shadowJar -x test
     - name: Push docker image to GAR
-      uses: nais/docker-build-push@078e460885ed0424b60d45ce9220b4be1748be9d # v0
+      uses: nais/docker-build-push@cd5ec5663feb0e05c3fa374d1fb442605b046c6b # v0
       env:
         TRIVY_JAVA_DB_REPOSITORY: "public.ecr.aws/aquasecurity/trivy-java-db:1"
       if: ${{ github.actor != 'dependabot[bot]' }}
