@@ -17,7 +17,7 @@ flowchart TD
     D --> H[deploy-prod]
 ```
 
-Builds 1 app per environment. Supports deploying demo-prefixed branches to their own ingress. Demo-applications will be deleted in 48 hours.
+Builds 1 app per environment. Supports deploying demo-prefixed branches to their own ingress. Demo apps for demo branches will be deleted in 7 days.
 
 <details>
 <summary>Detailed instructions</summary>
@@ -142,11 +142,11 @@ The current implementation uses `GITHUB_TOKEN` to approve the PR, then creates a
 
 #### Policy
 
-| Update type | Auto-merged? |
-|-------------|-------------|
-| GitHub Actions | ✅ Yes, including major |
-| Patch (non-GitHub Actions) | ✅ Yes |
-| Minor (non-GitHub Actions) | ✅ Yes |
+| Update type                | Auto-merged?                   |
+| -------------------------- | ------------------------------ |
+| GitHub Actions             | ✅ Yes, including major        |
+| Patch (non-GitHub Actions) | ✅ Yes                         |
+| Minor (non-GitHub Actions) | ✅ Yes                         |
 | Major (non-GitHub Actions) | ❌ No — requires manual review |
 
 The policy applies to both production and development dependencies.

@@ -129,7 +129,7 @@ jobs:
         env:
           CLUSTER: dev-gcp
           RESOURCE: nais/nais-demo.yaml
-          VAR: image=${{ needs.build-demo.outputs.image }},ingress=https://${{ steps.slug.outputs.slug }}.ekstern.dev.nav.no${{ inputs.base-path }},appname=${{ steps.slug.outputs.slug }},replicas=1,branchState=alive,ttl=48h
+          VAR: image=${{ needs.build-demo.outputs.image }},ingress=https://${{ steps.slug.outputs.slug }}.ekstern.dev.nav.no${{ inputs.base-path }},appname=${{ steps.slug.outputs.slug }},replicas=1,branchState=alive,ttl=168h
 
   build-prod:
     if: ${{ github.ref_name == 'main' }}
