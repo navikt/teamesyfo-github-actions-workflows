@@ -1,105 +1,64 @@
-# Next.js-workflows
+# Next.js-workflow
 
-Denne guiden dekker begge Next.js-workflowene i repoet:
+`next-app-v2.yaml` er den anbefalte workflowen for Next.js-apper i dette repoet. `next-app.yaml` er legacy, bygger på npm og fjernes snart.
 
-- `.github/workflows/next-app.yaml` (legacy npm)
-- `.github/workflows/next-app-v2.yaml`
+`next-app-v2.yaml` kjører lint og tester, bygger appen for dev, demo og prod, og deployer til riktig miljø. Workflowen støtter også demo-brancher med egen ingress og bruker `nais/nais-demo.yaml` for demo-deploy.
 
-Begge workflowene bygger én app per miljø, støtter demo-brancher med egen ingress og bruker `nais/nais-demo.yaml` for demo-deploy.
-
-## Flyt
+Hovedflyten i `next-app-v2.yaml` ser slik ut
 
 ```mermaid
 flowchart TD
-    A[test-and-verify<br><i>Lint + Unit tests + E2E</i>] --> B[build-dev]
+    A[test-and-verify<br><i>Lint + tester + valgfri E2E</i>]
+    A --> B[build-dev]
     A --> C[build-demo]
     A --> D[build-prod]
-    B --> E[deploy-dev]
-    C --> F[deploy-demo-main]
-    C --> G[deploy-demo-branch]
-    D --> H[deploy-prod]
+    B --> E[merge-gate]
+    B --> F[deploy-dev]
+    C --> G[deploy-demo-main]
+    C --> H[deploy-demo-branch]
+    D --> I[deploy-prod]
 ```
 
-## Når du skal bruke hvilken workflow
+## Viktigste inputs
 
-| Workflow-fil       | Bruk når                                    | Verifiserte forskjeller                                                                                                                                                                                                                                                                           |
-| ------------------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `next-app.yaml`    | Repoet bruker `npm` og `package-lock.json`. | Standard `node-version` er `20.x`. Tester kjører via `actions/npm-cached` og bygg via `actions/next-to-docker`. E2E styres av string-inputen `e2e-test-framework`, der `playwright` er eneste støttede verdi. Workflowen har ikke merge-gate og deploy-jobbene har ikke egen `merge_group`-guard. |
-| `next-app-v2.yaml` | Repoet bruker `pnpm` og `pnpm-lock.yaml`.   | Standard `node-version` er `24.x`. Tester kjører via `actions/setup-pnpm` og bygg via `actions/build-next-app`. E2E styres av boolean-inputen `run-e2e-tests`. Workflowen har en egen `merge-gate`-jobb og alle deploy-jobber hopper over kjøring når eventen er `merge_group`.                   |
-
-## Inputs
-
-### Felles inputs
-
-| Input          | Påkrevd | Beskrivelse                                                                           |
-| -------------- | ------- | ------------------------------------------------------------------------------------- |
-| `app`          | Ja      | Navn på applikasjonen.                                                                |
-| `base-path`    | Ja      | Base path for ingress, for eksempel `/min-app`.                                       |
-| `node-version` | Nei     | Node.js-versjon. Standard er `20.x` i `next-app.yaml` og `24.x` i `next-app-v2.yaml`. |
-
-### Workflow-spesifikke inputs
-
-| Workflow-fil       | Input                | Standard | Beskrivelse                                                                       |
-| ------------------ | -------------------- | -------- | --------------------------------------------------------------------------------- |
-| `next-app.yaml`    | `e2e-test-framework` | `""`     | Sett til `playwright` for å kjøre `actions/playwright-e2e`.                       |
-| `next-app-v2.yaml` | `run-e2e-tests`      | `false`  | Sett til `true` for å kjøre `actions/playwright-e2e` med `package-manager: pnpm`. |
+| Input           | Påkrevd | Beskrivelse                                            |
+| --------------- | ------- | ------------------------------------------------------ |
+| `app`           | Ja      | Navn på applikasjonen.                                 |
+| `base-path`     | Ja      | Base path for ingress, for eksempel `/min-app`.        |
+| `node-version`  | Nei     | Node.js-versjon. Standard er `24.x`.                   |
+| `run-e2e-tests` | Nei     | Sett til `true` for å kjøre Playwright-E2E med `pnpm`. |
 
 ## Krav i consumer-repoet
 
-### Gjelder begge workflowene
-
-1. Opprett en caller-workflow i consumer-repoet som bruker den reusable workflowen med `secrets: inherit`.
-2. Ha en `Dockerfile` i rotmappen. Build-actionene bygger applikasjonen først og bruker deretter `nais/docker-build-push` til å bygge image fra repoet.
-3. Ha NAIS-manifester i `nais/`:
+1. Opprett en caller-workflow som bruker `.github/workflows/next-app-v2.yaml` med `secrets: inherit`.
+2. Repoet må bruke `pnpm` og ha `pnpm-lock.yaml`.
+3. Repoet må kunne kjøre `pnpm run lint`, `pnpm run test` og `pnpm run build`.
+4. Hvis du setter `run-e2e-tests: true`, må Playwright kunne kjøres med `pnpm playwright test --reporter=html,github`.
+5. Ha en `Dockerfile` i rotmappen.
+6. Ha NAIS-manifester i `nais/`:
    - `nais/nais-dev.yaml`
    - `nais/nais-demo.yaml`
    - `nais/nais-prod.yaml`
-4. Ha miljøfiler i `nais/envs/`:
+7. Ha miljøfiler i `nais/envs/`:
    - `nais/envs/.env.dev`
    - `nais/envs/.env.demo`
    - `nais/envs/.env.prod`
 
-Begge build-actionene kopierer riktig fil til `.env.production` før `npm run build` eller `pnpm run build`.
-
-### Krav for demo-deploy
-
-`deploy-demo-main` og `deploy-demo-branch` bruker `nais/nais-demo.yaml` med variablene som workflowene sender inn:
-
-- `image`
-- `ingress`
-- `appname`
-- `replicas`
-- `branchState`
-
-`deploy-demo-branch` sender også inn `ttl=168h`. Bruk den hvis manifestet skal sette levetid på demo-brancher.
-
-### Krav per workflow
-
-| Workflow-fil       | Ekstra krav                                                                                                                                                                                                                      |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `next-app.yaml`    | Repoet må kunne installeres med `npm ci`, som i praksis betyr `package-lock.json`. Hvis du vil kjøre E2E, må repoet ha Playwright-oppsett som kan kjøres med standardkommandoen fra `actions/playwright-e2e`.                    |
-| `next-app-v2.yaml` | Repoet må kunne installeres med `pnpm install --frozen-lockfile`, som i praksis betyr `pnpm-lock.yaml`. Hvis du vil kjøre E2E, må repoet ha Playwright-oppsett som kan kjøres med `pnpm playwright test --reporter=html,github`. |
+Build-steget kopierer riktig miljøfil til `.env.production` før appen bygges.
 
 ## Deploy- og merge-regler
 
-### `next-app.yaml`
+- `build-dev` kjører når branchen ikke starter med `demo`.
+- `build-demo` kjører på `main` og brancher som starter med `demo`.
+- `build-prod` kjører bare på `main`.
+- `merge-gate` samler `test-and-verify` og `build-dev` i én stabil required check for branch protection.
+- Alle deploy-jobber hopper over kjøring når eventen er `merge_group`.
+- `deploy-dev` kjører ikke for Dependabot, draft pull requests eller demo-brancher.
+- `deploy-demo-main` kjører bare på `main`.
+- `deploy-demo-branch` kjører bare på brancher som starter med `demo` og sender også inn `ttl=168h`.
+- `deploy-prod` kjører bare på `main`.
 
-- `build-dev` kjører når branchen ikke starter med `demo`
-- `build-demo` kjører på `main` og brancher som starter med `demo`
-- `build-prod` kjører bare på `main`
-- `deploy-dev` kjører ikke for Dependabot og ikke for draft pull requests
-- `deploy-demo-main` kjører bare på `main`
-- `deploy-demo-branch` kjører bare på brancher som starter med `demo`
-- `deploy-prod` kjører bare på `main`
-
-### `next-app-v2.yaml`
-
-Samme byggelogikk som over, men med to ekstra vakter:
-
-- `merge-gate` samler `test-and-verify` og `build-dev` i én stabil required check for branch protection
-- alle deploy-jobber hopper over kjøring når eventen er `merge_group`
-
-## Eksempel: `next-app-v2.yaml`
+## Eksempel
 
 ```yaml
 name: Build and deploy

@@ -24,13 +24,13 @@ Dette repoet samler reusable workflows og composite actions for Team eSyfo sine 
 | `actions/jar-to-docker`      | Bygger `shadowJar` og bygger Docker-image.                                                         |
 | `actions/boot-jar-to-docker` | Bygger `bootJar` og bygger Docker-image.                                                           |
 | `actions/setup-pnpm`         | Setter opp Node.js, `pnpm` og installerer avhengigheter med cache.                                 |
-| `actions/npm-cached`         | Setter opp Node.js og installerer `npm`-avhengigheter med cache. **New apps shall not use npm!**   |
+| `actions/npm-cached`         | Setter opp Node.js og installerer `npm`-avhengigheter med cache. **Legacy!**                       |
 | `actions/gradle-cached`      | Setter opp Java og Gradle, validerer wrapper og bruker Gradle-cache.                               |
 | `actions/playwright-e2e`     | Installerer Playwright-browsere, kjører E2E-tester og laster opp rapport.                          |
 
 ## Oppsettguider
 
-- [docs/next-app.md](docs/next-app.md) — oppsett for `next-app.yaml` og `next-app-v2.yaml`
+- [docs/next-app.md](docs/next-app.md) — oppsett for `next-app-v2.yaml`
 - [docs/jvm-app.md](docs/jvm-app.md) — oppsett for `jar-app.yaml`, `boot-jar-app.yaml` og `fss-boot-jar-app.yaml`
 - [docs/dependabot-automerge.md](docs/dependabot-automerge.md) — anbefalt oppsett for Dependabot auto-merge
 - [docs/dependabot-label-and-merge.md](docs/dependabot-label-and-merge.md) — oppsett for `label-dependabot-pr.yaml` og `merge-dependabot-pr.yaml`
