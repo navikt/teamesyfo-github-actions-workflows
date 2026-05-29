@@ -17,16 +17,16 @@ Dette repoet samler reusable workflows og composite actions for Team eSyfo sine 
 
 ## Composite actions
 
-| Action                       | Kort beskrivelse                                                                                   |
-| ---------------------------- | -------------------------------------------------------------------------------------------------- |
-| `actions/build-next-app`     | Setter opp `pnpm`, bygger Next.js-appen, laster opp statiske filer til CDN og bygger Docker-image. |
-| `actions/next-to-docker`     | Setter opp `npm`, bygger Next.js-appen, laster opp statiske filer til CDN og bygger Docker-image.  |
-| `actions/jar-to-docker`      | Bygger `shadowJar` og bygger Docker-image.                                                         |
-| `actions/boot-jar-to-docker` | Bygger `bootJar` og bygger Docker-image.                                                           |
-| `actions/setup-pnpm`         | Setter opp Node.js, `pnpm` og installerer avhengigheter med cache.                                 |
-| `actions/npm-cached`         | Setter opp Node.js og installerer `npm`-avhengigheter med cache. **Legacy!**                       |
-| `actions/gradle-cached`      | Setter opp Java og Gradle, validerer wrapper og bruker Gradle-cache.                               |
-| `actions/playwright-e2e`     | Installerer Playwright-browsere, kjører E2E-tester og laster opp rapport.                          |
+| Action                       | Kort beskrivelse                                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `actions/build-next-app`     | Setter opp `pnpm`, bygger Next.js-appen, laster opp statiske filer til CDN og bygger Docker-image.            |
+| `actions/jar-to-docker`      | Bygger `shadowJar` og bygger Docker-image.                                                                    |
+| `actions/setup-pnpm`         | Setter opp Node.js, `pnpm` og installerer avhengigheter med cache.                                            |
+| `actions/gradle-cached`      | Setter opp Java og Gradle, validerer wrapper og bruker Gradle-cache.                                          |
+| `actions/playwright-e2e`     | Installerer Playwright-browsere, kjører E2E-tester og laster opp rapport.                                     |
+| `actions/next-to-docker`     | **Legacy!** Setter opp `npm`, bygger Next.js-appen, laster opp statiske filer til CDN og bygger Docker-image. |
+| `actions/boot-jar-to-docker` | **Legacy!** Bygger `bootJar` og bygger Docker-image.                                                          |
+| `actions/npm-cached`         | **Legacy!** Setter opp Node.js og installerer `npm`-avhengigheter med cache.                                  |
 
 ## Oppsettguider
 
