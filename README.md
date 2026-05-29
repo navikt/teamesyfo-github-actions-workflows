@@ -12,8 +12,8 @@ Dette repoet samler reusable workflows og composite actions for Team eSyfo sine 
 | `.github/workflows/next-app.yaml`             | **Legacy!** Next.js-workflow med `npm`, `actions/npm-cached` og `actions/next-to-docker`. **New apps shall not use npm!**     | [docs/next-app.md](docs/next-app.md)                         |
 | `.github/workflows/boot-jar-app.yaml`         | **Legacy!** JVM-workflow for `bootJar`-baserte apper i GCP.                                                                   | [docs/jvm-app.md](docs/jvm-app.md)                           |
 | `.github/workflows/fss-boot-jar-app.yaml`     | **Legacy!** JVM-workflow for `bootJar`-baserte apper i FSS.                                                                   | [docs/jvm-app.md](docs/jvm-app.md)                           |
-| `.github/workflows/label-dependabot-pr.yaml`  | **Legacy!** Finnes for eldre eller eksisterende oppsett. Nye oppsett bør bruke `dependabot-automerge.yaml`.                   | [Anbefalt oppsett](docs/dependabot-automerge.md)             |
-| `.github/workflows/merge-dependabot-pr.yaml`  | **Legacy!** Finnes for eldre eller eksisterende oppsett. Nye oppsett bør bruke `dependabot-automerge.yaml`.                   | [Anbefalt oppsett](docs/dependabot-automerge.md)             |
+| `.github/workflows/label-dependabot-pr.yaml`  | Finnes for oppsett som fortsatt bruker delt label- og merge-flyt. Nye oppsett bør bruke `dependabot-automerge.yaml`.          | [Anbefalt oppsett](docs/dependabot-automerge.md)             |
+| `.github/workflows/merge-dependabot-pr.yaml`  | Finnes for oppsett som fortsatt bruker delt label- og merge-flyt. Nye oppsett bør bruke `dependabot-automerge.yaml`.          | [Anbefalt oppsett](docs/dependabot-automerge.md)             |
 
 ## Composite actions
 

@@ -2,6 +2,28 @@
 
 This document explains how to use `dependabot-automerge.yaml` from `navikt/teamesyfo-github-actions-workflows`, what must be configured in the consumer repository, and how the merge queue flow works.
 
+## Quick start
+
+1. Grant the [`teamesyfo-automerge`](https://github.com/apps/teamesyfo-automerge) GitHub App access to the consumer repository.
+2. Add `AUTOMERGE_APP_PRIVATE_KEY` as a GitHub **Dependabot secret** in the consumer repository.
+3. Enable **Allow auto-merge** in Settings -> General -> Pull Requests.
+4. Enable **Read and write permissions** and **Allow GitHub Actions to create and approve pull requests** in Settings -> Actions -> General.
+5. Add a caller workflow that uses `navikt/teamesyfo-github-actions-workflows/.github/workflows/dependabot-automerge.yaml@main`.
+6. Configure at least one required CI check on the default branch. If the repository uses merge queue, the required workflow must also trigger on `merge_group`.
+
+## Policy
+
+| Update type | Auto-merged? | Notes |
+| --- | --- | --- |
+| GitHub Actions | ✅ Yes | Includes major updates |
+| Patch update in other ecosystems | ✅ Yes | Applies to production and development dependencies |
+| Minor update in other ecosystems | ✅ Yes | Applies to production and development dependencies |
+| Major update in other ecosystems | ❌ No | Requires manual review |
+
+## Important warning about required checks
+
+The workflow enables auto-merge with `gh pr merge --auto --squash`. GitHub only waits for branch protection or ruleset requirements. **If the repository has no required checks configured, the PR may merge immediately after the workflow runs.**
+
 ## Flow overview
 
 ```mermaid
@@ -26,10 +48,18 @@ flowchart TD
 The reusable workflow currently:
 
 1. Verifies that the PR author is `dependabot[bot]` and that the PR does not come from a fork.
-2. Creates a short-lived GitHub App token from `APP_PRIVATE_KEY` (this happens first, for all eligible Dependabot PRs).
+2. Creates a short-lived GitHub App token from `APP_PRIVATE_KEY`.
 3. Reads Dependabot metadata to determine ecosystem and update type.
-4. Approves eligible PRs with `GITHUB_TOKEN`.
-5. Enables auto-merge with `gh pr merge --auto --squash` using the GitHub App token.
+4. Evaluates whether the PR matches the auto-merge policy.
+5. Approves eligible PRs with `GITHUB_TOKEN`.
+6. Enables auto-merge with `gh pr merge --auto --squash` using the GitHub App token.
+
+The token flow is:
+
+1. The workflow generates a GitHub App token early in the job.
+2. It fetches Dependabot metadata and evaluates the policy.
+3. It approves eligible PRs with `GITHUB_TOKEN`.
+4. It enables auto-merge with the GitHub App token.
 
 The approval step uses `GITHUB_TOKEN`, while the merge step uses the GitHub App token. The GitHub App token is needed because `GITHUB_TOKEN` cannot trigger the `merge_group` validations required by merge queue.
 
@@ -113,14 +143,6 @@ jobs:
 ```
 
 The job name used as a required check should be stable, so the merge queue can keep validating PRs after auto-merge is enabled.
-
-## Policy
-
-Current policy:
-
-- GitHub Actions updates: always auto-merge, including major updates
-- Other ecosystems: auto-merge patch and minor updates
-- Other ecosystems: leave major updates for manual review
 
 ## Team eSyfo operational note
 
