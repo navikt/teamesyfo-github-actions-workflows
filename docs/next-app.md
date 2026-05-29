@@ -1,6 +1,8 @@
 # Next.js-workflow
 
-`next-app-v2.yaml` er den anbefalte workflowen for Next.js-apper i dette repoet. `next-app.yaml` er legacy, bygger på npm og fjernes snart.
+`next-app-v2.yaml` er den anbefalte og akktive workflowen for Next.js-apper i dette repoet. `next-app.yaml` er legacy, bygger på npm og fjernes snart.
+
+## Aktiv next-workflow
 
 `next-app-v2.yaml` kjører lint og tester, bygger appen for dev, demo og prod, og deployer til riktig miljø. Workflowen støtter også demo-brancher med egen ingress og bruker `nais/nais-demo.yaml` for demo-deploy.
 
