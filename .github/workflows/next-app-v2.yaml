@@ -52,7 +52,7 @@ jobs:
     outputs:
       image: ${{ steps.build-and-publish.outputs.image }}
     steps:
-      - uses: navikt/teamesyfo-github-actions-workflows/actions/build-next-app@main
+      - uses: navikt/teamesyfo-github-actions-workflows/actions/build-next-app@echo-next-build
         id: build-and-publish
         with:
           app: ${{ inputs.app }}
