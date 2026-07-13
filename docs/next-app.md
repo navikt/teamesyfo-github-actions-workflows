@@ -23,12 +23,13 @@ flowchart TD
 
 ## Viktigste inputs
 
-| Input           | Påkrevd | Beskrivelse                                            |
-| --------------- | ------- | ------------------------------------------------------ |
-| `app`           | Ja      | Navn på applikasjonen.                                 |
-| `base-path`     | Ja      | Base path for ingress, for eksempel `/min-app`.        |
-| `node-version`  | Nei     | Node.js-versjon. Standard er `24.x`.                   |
-| `run-e2e-tests` | Nei     | Sett til `true` for å kjøre Playwright-E2E med `pnpm`. |
+| Input                       | Påkrevd   | Beskrivelse                                            |
+| --------------------------- | --------- | ------------------------------------------------------ |
+| `app`                       | Ja        | Navn på applikasjonen.                                 |
+| `base-path`                 | Ja        | Base path for ingress, for eksempel `/min-app`.        |
+| `node-version`              | Nei       | Node.js-versjon. Standard er `24.x`.                   |
+| `run-e2e-tests`             | Nei       | Sett til `true` for å kjøre Playwright-E2E med `pnpm`. |
+| `enable-next-deployment-id` | Nei       | Sett til `false` hvis Next.js deploymentId/version skew protection bryter BUILD_ID/static assets. Standard er `true`. |
 
 ## Krav i consumer-repoet
 
@@ -82,4 +83,5 @@ jobs:
       app: my-next-app
       base-path: /my-next-app
       run-e2e-tests: true
+      enable-next-deployment-id: false
 ```
