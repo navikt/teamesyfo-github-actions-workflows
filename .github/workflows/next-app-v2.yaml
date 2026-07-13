@@ -21,6 +21,11 @@ on:
         required: false
         type: boolean
         default: false
+      enable-next-deployment-id:
+        description: "Enable Next.js deploymentId/version skew protection. Set to false if it breaks BUILD_ID/static assets."
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   test-and-verify:
@@ -59,6 +64,7 @@ jobs:
           env: dev
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           node-version: ${{ inputs.node-version }}
+          enable-next-deployment-id: ${{ inputs.enable-next-deployment-id }}
 
   build-demo:
     if: ${{ github.ref_name == 'main' || startsWith(github.ref_name, 'demo') }}
@@ -79,6 +85,7 @@ jobs:
           env: demo
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           node-version: ${{ inputs.node-version }}
+          enable-next-deployment-id: ${{ inputs.enable-next-deployment-id }}
 
   build-prod:
     if: ${{ github.ref_name == 'main' }}
@@ -99,6 +106,7 @@ jobs:
           env: prod
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           node-version: ${{ inputs.node-version }}
+          enable-next-deployment-id: ${{ inputs.enable-next-deployment-id }}
 
   merge-gate:
     name: Merge gate
