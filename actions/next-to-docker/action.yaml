@@ -14,6 +14,10 @@ inputs:
   node-version:
     required: false
     description: "Node version"
+  server-actions-encryption-key:
+    description: "Encryption key for Next.js Server Actions, should be a 32-byte base64 string"
+    required: false
+
 outputs:
   image:
     description: "Docker image in GAR"
@@ -33,7 +37,16 @@ runs:
         cp nais/envs/.env.${{ inputs.env }} .env.production
     - id: npm-build
       shell: bash
-      run: npm run build
+      run: |
+        if [ -n "${{ inputs.server-actions-encryption-key }}" ]; then
+          export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="${{ inputs.server-actions-encryption-key }}"
+          echo "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY is set, opting in for downstream usage."
+        else
+          echo "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY is not set, skipping build."
+          unset NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
+        fi
+        
+        npm run build
       env:
         NEXT_PUBLIC_VERSION: ${{ github.sha }}
     - name: Upload static files to NAV CDN

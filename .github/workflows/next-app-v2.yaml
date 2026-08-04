@@ -26,7 +26,6 @@ on:
         required: false
         type: boolean
         default: true
-
 jobs:
   test-and-verify:
     name: Test and lint
@@ -65,6 +64,7 @@ jobs:
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           node-version: ${{ inputs.node-version }}
           enable-next-deployment-id: ${{ inputs.enable-next-deployment-id }}
+          next-server-actions-encryption-key: ${{ secrets.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY }}
 
   build-demo:
     if: ${{ github.ref_name == 'main' || startsWith(github.ref_name, 'demo') }}
@@ -86,6 +86,7 @@ jobs:
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           node-version: ${{ inputs.node-version }}
           enable-next-deployment-id: ${{ inputs.enable-next-deployment-id }}
+          next-server-actions-encryption-key: ${{ secrets.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY }}
 
   build-prod:
     if: ${{ github.ref_name == 'main' }}
@@ -107,6 +108,7 @@ jobs:
           NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           node-version: ${{ inputs.node-version }}
           enable-next-deployment-id: ${{ inputs.enable-next-deployment-id }}
+          next-server-actions-encryption-key: ${{ secrets.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY }}
 
   merge-gate:
     name: Merge gate
