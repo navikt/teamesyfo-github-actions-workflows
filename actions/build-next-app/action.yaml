@@ -58,9 +58,9 @@ runs:
         
         if [ -n "${{ inputs.next-server-actions-encryption-key }}" ]; then
           export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="${{ inputs.next-server-actions-encryption-key }}"
-          echo "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY is set, opting in with custom key."
+          echo "::notice::NEXT_SERVER_ACTIONS_ENCRYPTION_KEY is set, opting in with custom key."
         else
-          echo "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY is not set, building with default behavior."
+          echo "::notice::NEXT_SERVER_ACTIONS_ENCRYPTION_KEY is not set, building with default behavior."
           unset NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
         fi
         
