@@ -56,7 +56,7 @@ jobs:
     outputs:
       image: ${{ steps.build-and-publish.outputs.image }}
     steps:
-      - uses: navikt/teamesyfo-github-actions-workflows/actions/build-next-app@optional-encryption-key-for-next-app-v2
+      - uses: navikt/teamesyfo-github-actions-workflows/actions/build-next-app@main
         id: build-and-publish
         with:
           app: ${{ inputs.app }}
