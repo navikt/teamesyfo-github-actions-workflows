@@ -14,7 +14,6 @@ inputs:
   node-version:
     required: false
     description: "Node version"
-
 outputs:
   image:
     description: "Docker image in GAR"
