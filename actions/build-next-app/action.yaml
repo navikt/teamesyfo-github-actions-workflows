@@ -18,7 +18,7 @@ inputs:
     description: "Enable Next.js deploymentId/version skew protection. Set to false if it breaks BUILD_ID/static assets."
     required: false
     default: true
-  server-actions-encryption-key:
+  next-server-actions-encryption-key:
     description: "Encryption key for Next.js Server Actions, should be a 32-byte base64 string"
     required: false
 
@@ -56,8 +56,8 @@ runs:
           unset NEXT_DEPLOYMENT_ID
         fi
         
-        if [ -n "${{ inputs.server-actions-encryption-key }}" ]; then
-          export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="${{ inputs.server-actions-encryption-key }}"
+        if [ -n "${{ inputs.next-server-actions-encryption-key }}" ]; then
+          export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="${{ inputs.next-server-actions-encryption-key }}"
           echo "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY is set, opting in with custom key."
         else
           echo "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY is not set, building with default behavior."
