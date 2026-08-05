@@ -31,6 +31,11 @@ flowchart TD
 | `run-e2e-tests`             | Nei       | Sett til `true` for å kjøre Playwright-E2E med `pnpm`. |
 | `enable-next-deployment-id` | Nei       | Sett til `false` hvis Next.js deploymentId/version skew protection bryter BUILD_ID/static assets. Standard er `true`. |
 
+## Repository secrets
+| Secret                       | Påkrevd | Beskrivelse                                                                                                                                                                            |
+| ---------------------------- |---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `NEXT_SERVER_ACTION_ENCRYPTION_KEY` | Nei     | 32-byte b64 encoded nøkkel for kryptering av server actions. Kan settes for å benytte samme nøkkel på tvers av deployments. Genereres med f.eks. `openssl rand -base64 32` (mac/linux) |
+
 ## Krav i consumer-repoet
 
 1. Opprett en caller-workflow som bruker `.github/workflows/next-app-v2.yaml` med `secrets: inherit`.
