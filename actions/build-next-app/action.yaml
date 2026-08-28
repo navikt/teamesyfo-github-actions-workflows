@@ -21,6 +21,10 @@ inputs:
   next-server-actions-encryption-key:
     description: "Encryption key for Next.js Server Actions, should be a 32-byte base64 string"
     required: false
+  publish-artifacts:
+    description: "Upload static files to CDN and push the Docker image"
+    required: false
+    default: "true"
 
 outputs:
   image:
@@ -70,14 +74,14 @@ runs:
         NEXT_DEPLOYMENT_ID: ${{ github.sha }}
     - name: Upload static files to NAV CDN
       uses: nais/deploy/actions/cdn-upload/v2@fa754451577294aae42872a69b888b3470478ec1 # v2 (master)
-      if: ${{ github.actor != 'dependabot[bot]' }}
+      if: ${{ inputs.publish-artifacts == 'true' && github.actor != 'dependabot[bot]' }}
       with:
         team: team-esyfo
         source: ./.next/static
         destination: "/${{ inputs.app }}/_next"
     - name: Push docker image to GAR
       uses: nais/docker-build-push@v0
-      if: ${{ github.actor != 'dependabot[bot]' }}
+      if: ${{ inputs.publish-artifacts == 'true' && github.actor != 'dependabot[bot]' }}
       id: docker-build-push
       with:
         team: team-esyfo

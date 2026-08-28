@@ -60,6 +60,7 @@ Build-steget kopierer riktig miljøfil til `.env.production` før appen bygges.
 - `build-demo` kjører på `main` og brancher som starter med `demo`.
 - `build-prod` kjører bare på `main`.
 - `merge-gate` samler `test-and-verify` og `build-dev` i én stabil required check for branch protection.
+- Ved `merge_group` bygger `build-dev` appen uten å laste opp CDN-filer eller pushe Docker-image. Artefakter publiseres først fra vanlige branch- og `main`-kjøringer.
 - Alle deploy-jobber hopper over kjøring når eventen er `merge_group`.
 - `deploy-dev` kjører ikke for Dependabot, draft pull requests eller demo-brancher.
 - `deploy-demo-main` kjører bare på `main`.

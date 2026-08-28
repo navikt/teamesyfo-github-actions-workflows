@@ -65,6 +65,7 @@ jobs:
           node-version: ${{ inputs.node-version }}
           enable-next-deployment-id: ${{ inputs.enable-next-deployment-id }}
           next-server-actions-encryption-key: ${{ secrets.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY }}
+          publish-artifacts: ${{ github.event_name != 'merge_group' }}
 
   build-demo:
     if: ${{ github.ref_name == 'main' || startsWith(github.ref_name, 'demo') }}
