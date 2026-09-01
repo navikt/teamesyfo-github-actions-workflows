@@ -5,12 +5,14 @@ on:
     paths:
       - ".github/workflows/next-app-v2.yaml"
       - ".github/workflows/validate-next-app-queue-policy.yaml"
+      - ".github/scripts/validate-next-app-queue-policy.rb"
       - "actions/build-next-app/action.yaml"
   push:
     branches: [main]
     paths:
       - ".github/workflows/next-app-v2.yaml"
       - ".github/workflows/validate-next-app-queue-policy.yaml"
+      - ".github/scripts/validate-next-app-queue-policy.rb"
       - "actions/build-next-app/action.yaml"
 
 permissions:
@@ -26,22 +28,5 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Evaluate artifact publication policy
-        env:
-          MERGE_GROUP: ${{ 'merge_group' != 'merge_group' && !startsWith('refs/heads/feature', 'refs/heads/gh-readonly-queue/') }}
-          QUEUE_PUSH: ${{ 'push' != 'merge_group' && !startsWith('refs/heads/gh-readonly-queue/main/pr-1000-0000000000000000000000000000000000000000', 'refs/heads/gh-readonly-queue/') }}
-          NORMAL_PUSH: ${{ 'push' != 'merge_group' && !startsWith('refs/heads/main', 'refs/heads/gh-readonly-queue/') }}
-        run: |
-          set -euo pipefail
-          test "$MERGE_GROUP" = false
-          test "$QUEUE_PUSH" = false
-          test "$NORMAL_PUSH" = true
-
-      - name: Verify production wiring
-        run: |
-          set -euo pipefail
-
-          queue_policy="github.event_name != 'merge_group' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/')"
-          test "$(grep -F -c "$queue_policy" .github/workflows/next-app-v2.yaml)" -eq 2
-          test "$(grep -F -c "$queue_policy" actions/build-next-app/action.yaml)" -eq 2
-          test "$(grep -F -c "inputs.publish-artifacts == 'true'" actions/build-next-app/action.yaml)" -eq 2
+      - name: Verify production queue guards
+        run: ruby .github/scripts/validate-next-app-queue-policy.rb
