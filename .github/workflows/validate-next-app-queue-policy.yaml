@@ -1,0 +1,32 @@
+name: Validate Next.js merge queue policy
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/next-app-v2.yaml"
+      - ".github/workflows/validate-next-app-queue-policy.yaml"
+      - ".github/scripts/validate-next-app-queue-policy.rb"
+      - "actions/build-next-app/action.yaml"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/next-app-v2.yaml"
+      - ".github/workflows/validate-next-app-queue-policy.yaml"
+      - ".github/scripts/validate-next-app-queue-policy.rb"
+      - "actions/build-next-app/action.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate queue policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Verify production queue guards
+        run: ruby .github/scripts/validate-next-app-queue-policy.rb
