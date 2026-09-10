@@ -23,12 +23,18 @@ flowchart TD
 
 ## Viktigste inputs
 
-| Input           | Påkrevd | Beskrivelse                                            |
-| --------------- | ------- | ------------------------------------------------------ |
-| `app`           | Ja      | Navn på applikasjonen.                                 |
-| `base-path`     | Ja      | Base path for ingress, for eksempel `/min-app`.        |
-| `node-version`  | Nei     | Node.js-versjon. Standard er `24.x`.                   |
-| `run-e2e-tests` | Nei     | Sett til `true` for å kjøre Playwright-E2E med `pnpm`. |
+| Input                       | Påkrevd   | Beskrivelse                                            |
+| --------------------------- | --------- | ------------------------------------------------------ |
+| `app`                       | Ja        | Navn på applikasjonen.                                 |
+| `base-path`                 | Ja        | Base path for ingress, for eksempel `/min-app`.        |
+| `node-version`              | Nei       | Node.js-versjon. Standard er `24.x`.                   |
+| `run-e2e-tests`             | Nei       | Sett til `true` for å kjøre Playwright-E2E med `pnpm`. |
+| `enable-next-deployment-id` | Nei       | Sett til `false` hvis Next.js deploymentId/version skew protection bryter BUILD_ID/static assets. Standard er `true`. |
+
+## Repository secrets
+| Secret                       | Påkrevd | Beskrivelse                                                                                                                                                                            |
+| ---------------------------- |---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `NEXT_SERVER_ACTION_ENCRYPTION_KEY` | Nei     | 32-byte b64 encoded nøkkel for kryptering av server actions. Kan settes for å benytte samme nøkkel på tvers av deployments. Genereres med f.eks. `openssl rand -base64 32` (mac/linux) |
 
 ## Krav i consumer-repoet
 
@@ -45,6 +51,7 @@ flowchart TD
    - `nais/envs/.env.dev`
    - `nais/envs/.env.demo`
    - `nais/envs/.env.prod`
+8. Hvis den kallende workflowen kjører på alle `push`-events, må den ekskludere `gh-readonly-queue/**`. GitHub sender både `push` og `merge_group` for købrancher, og bare `merge_group` skal validere køen. Legg også til `tags: ['**']` hvis tag-push fortsatt skal trigge workflowen.
 
 Build-steget kopierer riktig miljøfil til `.env.production` før appen bygges.
 
@@ -54,8 +61,9 @@ Build-steget kopierer riktig miljøfil til `.env.production` før appen bygges.
 - `build-demo` kjører på `main` og brancher som starter med `demo`.
 - `build-prod` kjører bare på `main`.
 - `merge-gate` samler `test-and-verify` og `build-dev` i én stabil required check for branch protection.
+- Ved merge queue bygger `build-dev` appen uten å laste opp CDN-filer eller pushe Docker-image. Betingelsen dekker både `merge_group` og eventuelle `push`-kjøringer fra `gh-readonly-queue/**`.
 - Alle deploy-jobber hopper over kjøring når eventen er `merge_group`.
-- `deploy-dev` kjører ikke for Dependabot, draft pull requests eller demo-brancher.
+- `deploy-dev` kjører ikke for merge queue, Dependabot, draft pull requests eller demo-brancher.
 - `deploy-demo-main` kjører bare på `main`.
 - `deploy-demo-branch` kjører bare på brancher som starter med `demo` og sender også inn `ttl=168h`.
 - `deploy-prod` kjører bare på `main`.
@@ -82,4 +90,5 @@ jobs:
       app: my-next-app
       base-path: /my-next-app
       run-e2e-tests: true
+      enable-next-deployment-id: false
 ```
