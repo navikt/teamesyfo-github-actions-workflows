@@ -192,7 +192,7 @@ jobs:
     needs: [test-and-verify, build-demo]
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-      - uses: gacts/github-slug@83cd3d95888be8777f0d9c810c1266da1c5c3ef1 # v1
+      - uses: gacts/github-slug@c29c0ddd888a1703a6fc06c55a5f6ddd7beae490 # v1
         id: slug
         with:
           to-slug: ${{ inputs.app }}-${{ github.ref_name }}
