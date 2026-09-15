@@ -37,7 +37,7 @@ runs:
       env:
         NEXT_PUBLIC_VERSION: ${{ github.sha }}
     - name: Upload static files to NAV CDN
-      uses: nais/deploy/actions/cdn-upload/v2@5fdd91aaf69bb0d6dd5e5118cdacb639f487b93b # v2
+      uses: nais/deploy/actions/cdn-upload/v2@5cf9820a8a72e3e5b427ed65efd55218692e8443 # v2
       if: ${{ github.actor != 'dependabot[bot]' }}
       with:
         team: team-esyfo
