@@ -160,7 +160,7 @@ jobs:
         uses: mikefarah/yq@c14f446382944492701b16c1ddb48bb9dbe683e3 # v4.53.6
         with:
           cmd: yq '.spec.ingresses[0]' nais/nais-dev.yaml
-      - uses: nais/deploy/actions/deploy@fa754451577294aae42872a69b888b3470478ec1 # v2
+      - uses: nais/deploy/actions/deploy@5cf9820a8a72e3e5b427ed65efd55218692e8443 # v2
         env:
           CLUSTER: dev-gcp
           RESOURCE: nais/nais-dev.yaml
@@ -176,7 +176,7 @@ jobs:
     needs: [test-and-verify, build-demo]
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-      - uses: nais/deploy/actions/deploy@fa754451577294aae42872a69b888b3470478ec1 # v2
+      - uses: nais/deploy/actions/deploy@5cf9820a8a72e3e5b427ed65efd55218692e8443 # v2
         env:
           CLUSTER: dev-gcp
           RESOURCE: nais/nais-demo.yaml
@@ -196,7 +196,7 @@ jobs:
         id: slug
         with:
           to-slug: ${{ inputs.app }}-${{ github.ref_name }}
-      - uses: nais/deploy/actions/deploy@fa754451577294aae42872a69b888b3470478ec1 # v2
+      - uses: nais/deploy/actions/deploy@5cf9820a8a72e3e5b427ed65efd55218692e8443 # v2
         env:
           CLUSTER: dev-gcp
           RESOURCE: nais/nais-demo.yaml
@@ -216,7 +216,7 @@ jobs:
         uses: mikefarah/yq@c14f446382944492701b16c1ddb48bb9dbe683e3 # v4.53.6
         with:
           cmd: yq '.spec.ingresses[0]' nais/nais-prod.yaml
-      - uses: nais/deploy/actions/deploy@fa754451577294aae42872a69b888b3470478ec1 # v2
+      - uses: nais/deploy/actions/deploy@5cf9820a8a72e3e5b427ed65efd55218692e8443 # v2
         env:
           CLUSTER: prod-gcp
           RESOURCE: nais/nais-prod.yaml
