@@ -155,7 +155,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test-and-verify, build-dev]
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: get-ingress
         uses: mikefarah/yq@c14f446382944492701b16c1ddb48bb9dbe683e3 # v4.53.6
         with:
@@ -175,7 +175,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test-and-verify, build-demo]
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: nais/deploy/actions/deploy@fa754451577294aae42872a69b888b3470478ec1 # v2
         env:
           CLUSTER: dev-gcp
@@ -191,7 +191,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test-and-verify, build-demo]
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: gacts/github-slug@c29c0ddd888a1703a6fc06c55a5f6ddd7beae490 # v1
         id: slug
         with:
@@ -211,7 +211,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test-and-verify, build-prod]
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: get-ingress
         uses: mikefarah/yq@c14f446382944492701b16c1ddb48bb9dbe683e3 # v4.53.6
         with:
