@@ -25,7 +25,7 @@ on:
         description: "Enable Next.js deploymentId/version skew protection. Set to false if it breaks BUILD_ID/static assets."
         required: false
         type: boolean
-        default: true
+        default: false
 jobs:
   test-and-verify:
     name: Test and lint
