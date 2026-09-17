@@ -2,7 +2,7 @@
 
 Denne guiden beskriver `jar-app.yaml`, som er den aktive og anbefalte JVM-workflowen i repoet.
 
-`boot-jar-app.yaml` og `fss-boot-jar-app.yaml` finnes fortsatt av legacy-årsaker, men er ikke beskrevet videre her.
+`boot-jar-app.yaml` finnes fortsatt av legacy-årsaker, men er ikke beskrevet videre her.
 
 ## Aktiv JVM-workflow
 
