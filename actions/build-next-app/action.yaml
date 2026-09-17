@@ -15,9 +15,9 @@ inputs:
     description: "Node version"
     required: true
   enable-next-deployment-id:
-    description: "Enable Next.js deploymentId/version skew protection. Set to false if it breaks BUILD_ID/static assets."
+    description: "Enable Next.js deploymentId/version skew protection."
     required: false
-    default: true
+    default: false
   next-server-actions-encryption-key:
     description: "Encryption key for Next.js Server Actions, should be a 32-byte base64 string"
     required: false
