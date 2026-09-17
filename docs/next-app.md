@@ -29,7 +29,7 @@ flowchart TD
 | `base-path`                 | Ja        | Base path for ingress, for eksempel `/min-app`.        |
 | `node-version`              | Nei       | Node.js-versjon. Standard er `24.x`.                   |
 | `run-e2e-tests`             | Nei       | Sett til `true` for å kjøre Playwright-E2E med `pnpm`. |
-| `enable-next-deployment-id` | Nei       | Sett til `false` hvis Next.js deploymentId/version skew protection bryter BUILD_ID/static assets. Standard er `true`. |
+| `enable-next-deployment-id` | Nei       | Sett til `true` for å aktivere Next.js deploymentId/version skew protection. Standard er `false`. |
 
 ## Repository secrets
 | Secret                       | Påkrevd | Beskrivelse                                                                                                                                                                            |
