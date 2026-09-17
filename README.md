@@ -11,7 +11,6 @@ Dette repoet samler reusable workflows og composite actions for Team eSyfo sine 
 | `.github/workflows/dependabot-automerge.yaml` | Anbefalt workflow for auto-approval og auto-merge av trygge Dependabot-PR-er.                                                 | [docs/dependabot-automerge.md](docs/dependabot-automerge.md) |
 | `.github/workflows/next-app.yaml`             | **Legacy!** Next.js-workflow med `npm`, `actions/npm-cached` og `actions/next-to-docker`. **New apps shall not use npm!**     | [docs/next-app.md](docs/next-app.md)                         |
 | `.github/workflows/boot-jar-app.yaml`         | **Legacy!** JVM-workflow for `bootJar`-baserte apper i GCP.                                                                   | [docs/jvm-app.md](docs/jvm-app.md)                           |
-| `.github/workflows/fss-boot-jar-app.yaml`     | **Legacy!** JVM-workflow for `bootJar`-baserte apper i FSS.                                                                   | [docs/jvm-app.md](docs/jvm-app.md)                           |
 | `.github/workflows/label-dependabot-pr.yaml`  | Finnes for oppsett som fortsatt bruker delt label- og merge-flyt. Nye oppsett bør bruke `dependabot-automerge.yaml`.          | [Anbefalt oppsett](docs/dependabot-automerge.md)             |
 | `.github/workflows/merge-dependabot-pr.yaml`  | Finnes for oppsett som fortsatt bruker delt label- og merge-flyt. Nye oppsett bør bruke `dependabot-automerge.yaml`.          | [Anbefalt oppsett](docs/dependabot-automerge.md)             |
 
@@ -31,7 +30,7 @@ Dette repoet samler reusable workflows og composite actions for Team eSyfo sine 
 ## Oppsettguider
 
 - [docs/next-app.md](docs/next-app.md) — oppsett for `next-app-v2.yaml`
-- [docs/jvm-app.md](docs/jvm-app.md) — oppsett for `jar-app.yaml`; **Legacy!**: `boot-jar-app.yaml` og `fss-boot-jar-app.yaml`
+- [docs/jvm-app.md](docs/jvm-app.md) — oppsett for `jar-app.yaml`; **Legacy!**: `boot-jar-app.yaml`
 - [docs/dependabot-automerge.md](docs/dependabot-automerge.md) — anbefalt oppsett for Dependabot auto-merge
 - `label-dependabot-pr.yaml` og `merge-dependabot-pr.yaml` finnes for eldre eller eksisterende oppsett. Nye oppsett bør bruke `dependabot-automerge.yaml`.
 
