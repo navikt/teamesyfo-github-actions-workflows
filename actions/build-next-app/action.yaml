@@ -39,7 +39,7 @@ runs:
         NPM_AUTH_TOKEN: ${{ inputs.NPM_AUTH_TOKEN }}
         node-version: ${{ inputs.node-version }}
     - name: Cache Next.js build
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
       with:
         path: |
           ${{ github.workspace }}/.next/cache
