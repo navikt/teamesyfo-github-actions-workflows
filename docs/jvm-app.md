@@ -6,7 +6,7 @@ Denne guiden beskriver `jar-app.yaml`, som er den aktive og anbefalte JVM-workfl
 
 ## Aktiv JVM-workflow
 
-Bruk denne workflowen når applikasjonen bygger en `shadowJar`. Workflowen bygger Docker-image, kjører tester, har egen merge-gate og deployer med `nais/deploy/actions/deploy` til `dev-gcp` og `prod-gcp`.
+Bruk denne workflowen når applikasjonen bygger en `shadowJar`. Workflowen bygger Docker-image, kjører Gradle `check` (tester og lint, for eksempel ktlint), har egen merge-gate og deployer med `nais/deploy/actions/deploy` til `dev-gcp` og `prod-gcp`.
 
 ## Inputs
 
@@ -32,7 +32,7 @@ Hovedflyten i `jar-app.yaml` ser slik ut:
 ```mermaid
 flowchart TD
     A[analyze<br><i>CodeQL + shadowJar</i>]
-    B[test<br><i>Gradle test</i>]
+    B[test<br><i>Gradle check: test og lint</i>]
     C[build<br><i>Bygg og publiser image</i>]
     A --> D[merge-gate]
     B --> D
