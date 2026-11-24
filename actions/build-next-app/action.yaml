@@ -80,7 +80,7 @@ runs:
         source: ./.next/static
         destination: "/${{ inputs.app }}/_next"
     - name: Push docker image to GAR
-      uses: nais/docker-build-push@v0
+      uses: nais/docker-build-push@v1
       if: ${{ inputs.publish-artifacts == 'true' && github.event_name != 'merge_group' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && github.actor != 'dependabot[bot]' }}
       id: docker-build-push
       with:
