@@ -1,0 +1,55 @@
+name: Dependabot automerge (v2)
+
+# Reusable workflow that approves and merges Dependabot pull requests.
+# Call it on a schedule from the default branch. It never checks out or runs
+# code from a pull request, and it approves and merges only the exact commit
+# it has checked. See docs/dependabot-automerge.md for the policy, the setup
+# and the migration from dependabot-automerge.yaml (v1).
+#
+# Prerequisites in the calling repository:
+#   - An environment named "dependabot-automerge" that only the default
+#     branch can use, with the secret AUTOMERGE_APP_PRIVATE_KEY.
+#   - The teamesyfo-automerge GitHub App installed on the repository.
+#   - CI that runs on pull_request, so that every Dependabot PR gets at least
+#     one successful check.
+
+on:
+  workflow_call:
+    inputs:
+      copilot-review:
+        description: "Request a comment-only Copilot review on updates that need a manual review."
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      AUTOMERGE_APP_PRIVATE_KEY:
+        description: "Private key for the teamesyfo-automerge GitHub App. Store it only as a secret in the dependabot-automerge environment."
+        required: true
+
+permissions: {}
+
+jobs:
+  automerge:
+    name: Approve and merge Dependabot PRs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The environment keeps the App key away from every branch except the
+    # default branch, and its secret takes precedence over the caller's.
+    environment:
+      name: dependabot-automerge
+      deployment: false
+    concurrency:
+      group: teamesyfo-dependabot-automerge
+      cancel-in-progress: false
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      pull-requests: write
+      statuses: read
+    steps:
+      - name: Approve and merge Dependabot PRs
+        uses: $/actions/dependabot-automerge
+        with:
+          app-private-key: ${{ secrets.AUTOMERGE_APP_PRIVATE_KEY }}
+          copilot-review: ${{ inputs.copilot-review }}

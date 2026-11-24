@@ -1,181 +1,173 @@
-# Dependabot auto-merge
+# Dependabot automerge
 
-This document explains how to use `dependabot-automerge.yaml` from `navikt/teamesyfo-github-actions-workflows`, what must be configured in the consumer repository, and how the merge queue flow works.
+This document explains how to use `dependabot-automerge-v2.yaml` from `navikt/teamesyfo-github-actions-workflows`, what the consumer repository must configure, and how to migrate from `dependabot-automerge.yaml` (v1).
+
+v1 is deprecated. It runs on `pull_request` with the App key as a Dependabot secret, and it enables auto-merge without binding the approval to a commit. See [Migrate from v1](#migrate-from-v1).
 
 ## Quick start
 
-1. Grant the [`teamesyfo-automerge`](https://github.com/apps/teamesyfo-automerge) GitHub App access to the consumer repository.
-2. Add `AUTOMERGE_APP_PRIVATE_KEY` as a GitHub **Dependabot secret** in the consumer repository.
-3. Enable **Allow auto-merge** in Settings -> General -> Pull Requests.
-4. Enable **Read and write permissions** and **Allow GitHub Actions to create and approve pull requests** in Settings -> Actions -> General.
-5. Add a caller workflow that uses `navikt/teamesyfo-github-actions-workflows/.github/workflows/dependabot-automerge.yaml@main`.
-6. Configure at least one required CI check on the default branch. If the repository uses merge queue, the required workflow must also trigger on `merge_group`.
+1. Grant the [`teamesyfo-automerge`](https://github.com/apps/teamesyfo-automerge) GitHub App access to the repository.
+2. Create the environment `dependabot-automerge` in Settings -> Environments. Under **Deployment branches and tags**, select **Selected branches and tags** and add only the default branch. Do not add required reviewers, because the workflow runs on a schedule.
+3. Add the App private key as the **environment secret** `AUTOMERGE_APP_PRIVATE_KEY` in that environment. Do not store the key as a repository secret, an organization secret or a Dependabot secret.
+4. Enable **Allow GitHub Actions to create and approve pull requests** in Settings -> Actions -> General. The default workflow permissions can stay read-only, because the workflow sets its own permissions.
+5. Allow squash merging in Settings -> General -> Pull Requests, unless the repository uses a merge queue.
+6. Make sure that CI runs on `pull_request`, so that every Dependabot PR gets at least one successful check. With a merge queue, CI must also run on `merge_group`.
+7. Add the [caller workflow](#caller-workflow).
+8. Check the environment: start the workflow manually on a branch other than the default branch. GitHub must reject the job. If the job runs, the environment does not restrict branches, and every branch can read the App key.
+9. Optional: copy the [Copilot review instructions](#copilot-review-of-manual-updates).
 
 ## Policy
 
-| Update type | Auto-merged? | Notes |
+| Update | Automerged? | Notes |
 | --- | --- | --- |
 | GitHub Actions | ✅ Yes | Includes major updates |
-| Patch update in other ecosystems | ✅ Yes | Applies to production and development dependencies |
-| Minor update in other ecosystems | ✅ Yes | Applies to production and development dependencies |
-| Major update in other ecosystems | ❌ No | Requires manual review |
+| Patch or minor update in other ecosystems | ✅ Yes | All updates in a grouped PR must be patch or minor |
+| Major update in other ecosystems | ❌ No | Manual review, with an optional Copilot review |
+| Other ecosystems without Dependabot metadata in the commit | ❌ No | Manual review |
 
-## Important warning about required checks
+The ecosystem comes from the branch name (`dependabot/<ecosystem>/...`). The update types come from the metadata block that Dependabot adds to its commit message.
 
-The workflow enables auto-merge with `gh pr merge --auto --squash`. GitHub only waits for branch protection or ruleset requirements. **If the repository has no required checks configured, the PR may merge immediately after the workflow runs.**
+## When the workflow approves and merges
 
-## Flow overview
+The workflow checks every open pull request that targets the default branch. It approves a pull request only when all of these conditions are true:
+
+- `dependabot[bot]` opened it from a `dependabot/` branch in the same repository.
+- It follows the [policy](#policy) and is not a draft.
+- It has exactly one commit. That commit is the head of the pull request, Dependabot wrote it, GitHub committed it, and GitHub verified its signature. If anyone else pushes to the branch, the pull request needs a manual review.
+- No reviewer's latest review requests changes.
+- GitHub reports no merge conflict.
+- On the head commit, no check run, commit status or workflow run has failed, been cancelled or timed out, none is still running, and at least one has succeeded. Skipped and neutral checks do not count as successful.
+- The merge window is open. Scheduled runs pause on Saturdays, Sundays, 1 May, 17 May and from 24 December to 1 January (Europe/Oslo). A manual run (`workflow_dispatch`) ignores the merge window.
+
+The workflow then approves exactly the head commit with `GITHUB_TOKEN`, so the approval comes from `github-actions[bot]`. It reads the pull request again and dismisses its own approval if the head has changed. It also dismisses earlier approvals from `github-actions[bot]` of commits that are no longer the head.
+
+Finally, it creates a short-lived token for the GitHub App and merges the approved commit:
+
+- With a merge queue, it adds the pull request to the queue with `expectedHeadOid`, so GitHub rejects it if the head has changed.
+- Without a merge queue, it squash-merges with the `sha` of the approved commit, so GitHub rejects the merge if the head has changed.
+
+The workflow never checks out or runs code from a pull request. If a merge fails, the job log shows a warning and the next run tries again. The workflow does not fall back to another merge method.
 
 ```mermaid
 flowchart TD
-    A[Dependabot opens or updates a PR] --> B[Consumer repo triggers caller workflow on pull_request]
-    B --> C[Generate GitHub App token from APP_PRIVATE_KEY]
-    C --> D[Fetch Dependabot metadata]
-    D --> E{Should this PR be auto-merged?}
-    E -->|GitHub Actions update| F[Approve PR with GITHUB_TOKEN]
-    E -->|Patch or minor update| F
-    E -->|Major non-GitHub-Actions update| G[Leave PR for manual review]
-    F --> H[Enable auto-merge with GitHub App token]
-    H --> I{Merge queue enabled?}
-    I -->|Yes| J[GitHub creates merge_group and runs required checks]
-    I -->|No| K[GitHub merges when branch requirements are satisfied]
-    J --> L[PR merged]
-    K --> L
+    A[Schedule or manual run on the default branch] --> B[List open Dependabot PRs]
+    B --> C{Policy allows automerge?}
+    C -->|No| D[Request a comment-only Copilot review once per set of versions]
+    C -->|Yes| E{One verified Dependabot commit, no changes requested, no conflict, checks green, merge window open?}
+    E -->|No| F[Log the reason and wait for the next run]
+    E -->|Yes| G[Approve the head commit with GITHUB_TOKEN]
+    G --> H{Head unchanged?}
+    H -->|No| I[Dismiss the approval]
+    H -->|Yes| J[Create a GitHub App token]
+    J --> K{Merge queue?}
+    K -->|Yes| L[Add to the queue with expectedHeadOid]
+    K -->|No| M[Squash-merge with sha]
 ```
 
-## What the reusable workflow does
+## Caller workflow
 
-The reusable workflow currently:
-
-1. Verifies that the PR author is `dependabot[bot]` and that the PR does not come from a fork.
-2. Creates a short-lived GitHub App token from `APP_PRIVATE_KEY`.
-3. Reads Dependabot metadata to determine ecosystem and update type.
-4. Evaluates whether the PR matches the auto-merge policy.
-5. Approves eligible PRs with `GITHUB_TOKEN`.
-6. Enables auto-merge with `gh pr merge --auto --squash` using the GitHub App token.
-
-The token flow is:
-
-1. The workflow generates a GitHub App token early in the job.
-2. It fetches Dependabot metadata and evaluates the policy.
-3. It approves eligible PRs with `GITHUB_TOKEN`.
-4. It enables auto-merge with the GitHub App token.
-
-The approval step uses `GITHUB_TOKEN`, while the merge step uses the GitHub App token. The GitHub App token is needed because `GITHUB_TOKEN` cannot trigger the `merge_group` validations required by merge queue.
-
-## Prerequisites in the consumer repo
-
-Before adding the caller workflow, make sure the consumer repo has the following in place:
-
-### 1. GitHub App access
-
-Grant the [`teamesyfo-automerge`](https://github.com/apps/teamesyfo-automerge) GitHub App repository access to the consumer repository.
-
-Without explicit repo access, the app cannot mint an installation token for that repo, and the workflow cannot enable auto-merge.
-
-### 2. Dependabot secret
-
-Add the app private key as a GitHub **Dependabot secret** in the consumer repository.
-
-Recommended secret name:
-
-- `AUTOMERGE_APP_PRIVATE_KEY`
-
-Why a Dependabot secret?
-
-- Dependabot-triggered workflow runs do not get access to regular Actions secrets.
-- The caller workflow reads the secret via `${{ secrets.AUTOMERGE_APP_PRIVATE_KEY }}` and passes it to the reusable workflow as `APP_PRIVATE_KEY`.
-
-### 3. Repository settings
-
-Enable the following settings in the consumer repository:
-
-- **Allow auto-merge** in Settings -> General -> Pull Requests
-- **Read and write permissions** for workflows in Settings -> Actions -> General
-- **Allow GitHub Actions to create and approve pull requests** in Settings -> Actions -> General
-
-### 4. Required CI checks and merge queue
-
-The repository should require at least one CI check on the default branch. Without required checks, Dependabot PRs may merge immediately after the workflow enables auto-merge.
-
-GitHub auto-merge does not strictly require merge queue. It can also work with ordinary branch protection or rulesets plus required checks.
-
-For Team eSyfo repositories, though, merge queue should be treated as the expected setup. If the repository uses **merge queue**, the required CI workflow must also run on `merge_group`.
-
-## Caller workflow example
-
-Create a workflow such as `.github/workflows/dependabot-automerge.yaml`:
+Create `.github/workflows/dependabot-automerge.yaml` on the default branch:
 
 ```yaml
-name: Dependabot auto-approve and auto-merge
+name: Dependabot automerge
 
 on:
-  pull_request:
-    types: [opened, reopened, synchronize]
+  schedule:
+    # Every 30 minutes on weekdays, 07:00–15:30 in Oslo.
+    - cron: "*/30 7-15 * * 1-5"
+      timezone: "Europe/Oslo"
+  workflow_dispatch:
+
+permissions: {}
 
 jobs:
   automerge:
     permissions:
-      contents: write
+      actions: read
+      checks: read
+      contents: read
       pull-requests: write
-    uses: navikt/teamesyfo-github-actions-workflows/.github/workflows/dependabot-automerge.yaml@main
+      statuses: read
+    uses: navikt/teamesyfo-github-actions-workflows/.github/workflows/dependabot-automerge-v2.yaml@<full commit SHA> # main
     secrets:
-      APP_PRIVATE_KEY: ${{ secrets.AUTOMERGE_APP_PRIVATE_KEY }}
+      AUTOMERGE_APP_PRIVATE_KEY: ${{ secrets.AUTOMERGE_APP_PRIVATE_KEY }}
 ```
 
-## Merge queue example
+- Pin the workflow to a full commit SHA. The workflow uses the App key, so a change on `main` in this repository should not reach your repository before you update the pin.
+- The caller must pass the secret by name, although the secret only exists in the environment. The environment secret takes precedence.
+- To turn off the Copilot review, add `with: copilot-review: false` to the job.
+- Scheduled workflows run only on the default branch. In a public repository, GitHub disables scheduled workflows after 60 days without activity. Enable the workflow again in the Actions tab if that happens.
 
-If the consumer repository uses merge queue, make sure its CI workflow also listens to `merge_group`:
+## Merge queue
+
+A merge queue is recommended. With a merge queue, the required CI workflow must also run on `merge_group`:
 
 ```yaml
-name: CI
-
 on:
   pull_request:
   merge_group:
     types: [checks_requested]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "run required checks here"
 ```
 
-The job name used as a required check should be stable, so the merge queue can keep validating PRs after auto-merge is enabled.
+The App token is needed for the queue, because `GITHUB_TOKEN` cannot add pull requests to a merge queue, and changes from `GITHUB_TOKEN` do not trigger new workflow runs.
 
-## Team eSyfo operational note
+Without a merge queue, the workflow merges directly. Then:
 
-For Team eSyfo repositories, the private key is managed outside GitHub and copied into each target repository as a Dependabot secret before the workflow is enabled.
+- If the branch must be up to date before merging, the merge fails until Dependabot rebases the pull request.
+- A pull request that changes files in `.github/workflows/` may need the `workflows` permission, which the App does not have. This has not been verified yet. If the merge fails, the job log shows a warning and the pull request stays open. A merge queue avoids the problem.
 
-If you are doing the setup for Team eSyfo, confirm both of these before rollout:
+## Copilot review of manual updates
 
-- the `teamesyfo-automerge` app has repository access to the target repo
-- the target repo has a Dependabot secret containing the current app private key
+For updates that the workflow does not merge, such as major updates, the workflow requests a review from Copilot. It requests at most one review per set of dependency versions, so a Dependabot rebase does not start a new review. The repository must have access to Copilot code review. Otherwise the job log shows a warning.
+
+Copilot reviews with comments only. A human must review and merge the pull request.
+
+To give Copilot the same review rules as other Team eSyfo repositories, copy [`docs/templates/dependency-updates.instructions.md`](templates/dependency-updates.instructions.md) to `.github/instructions/dependency-updates.instructions.md` in the consumer repository. The template asks Copilot to read the upstream release notes, to name what must change in the repository, and never to approve.
+
+## Migrate from v1
+
+1. Create the environment and the environment secret, as described in steps 2 and 3 in the [quick start](#quick-start).
+2. Replace the caller workflow with the [v2 caller](#caller-workflow). Remove the `pull_request` trigger.
+3. Delete the Dependabot secret `AUTOMERGE_APP_PRIVATE_KEY`, and any repository secret that contains the App key.
+4. Turn off the auto-merge that v1 enabled on open Dependabot pull requests:
+
+   ```bash
+   for number in $(gh pr list --author app/dependabot --state open --json number,autoMergeRequest \
+     --jq '.[] | select(.autoMergeRequest != null) | .number'); do
+     gh pr merge --disable-auto "$number"
+   done
+   ```
+
+   v2 dismisses old approvals from `github-actions[bot]` itself on its first run.
+5. Check the environment, as described in step 8 in the [quick start](#quick-start). Then start the workflow manually on the default branch once, and read the job log.
+
+When all consumer repositories use v2, the team creates a new private key for the App, stores it only in the environments, and revokes the old key. Then `dependabot-automerge.yaml` (v1) can be deleted.
+
+## Security model and remaining risks
+
+- The job that holds the App key never checks out or runs pull request code. The key is only available to the default branch, through the environment.
+- The approval and the merge are bound to the commit that the workflow checked.
+- Only an untouched, verified Dependabot commit can be automerged.
+- The approval from `github-actions[bot]` counts as the required review. This is the same policy as in v1.
+- A malicious version of a dependency that passes CI is still merged. CI, required checks and a Dependabot cooldown reduce this risk.
+- Anyone who can push to the default branch can change the caller workflow and use the key, as with other secrets that only the default branch can use.
 
 ## Troubleshooting
 
-### `APP_PRIVATE_KEY` is missing
+The job log has one line for each Dependabot pull request, with the reason when the workflow does not approve it.
 
-Make sure the consumer repository has the private key stored as a **Dependabot secret**, not only as a regular Actions secret.
+| Message or symptom | What to do |
+| --- | --- |
+| The workflow never runs | Check that the caller workflow is on the default branch, and that GitHub has not disabled the schedule. |
+| The job waits for or is rejected by the environment | Check that the environment allows the default branch, and that it has no required reviewers. |
+| `The secret AUTOMERGE_APP_PRIVATE_KEY is empty` | Add the key as an environment secret in `dependabot-automerge`. |
+| `no check has succeeded` | Add CI that runs on `pull_request`. |
+| `the PR has 2 commits, expected 1` or `the committer is not GitHub` | Someone pushed to the Dependabot branch. Review the pull request manually, or comment `@dependabot recreate`. |
+| `check "..." concluded cancelled` | Run the check again. |
+| `GitHub has not computed mergeability yet` | Wait for the next run. |
+| `not merged: ...` | Check that the App has access to the repository, that squash merging is allowed, and see [Merge queue](#merge-queue). |
+| `could not request a Copilot review` | Check that the repository has access to Copilot code review, or set `copilot-review: false`. |
 
-### The PR is approved but never enters merge queue
+## v1 (deprecated)
 
-Check:
-
-- that auto-merge is enabled in repository settings
-- that the GitHub App has access to the repository
-- that the workflow can read the Dependabot secret
-
-### Merge queue never runs checks
-
-Make sure the required CI workflow listens to:
-
-```yaml
-merge_group:
-  types: [checks_requested]
-```
-
-### The PR merged immediately
-
-This usually means the consumer repository has no required checks configured on the default branch or ruleset.
+`dependabot-automerge.yaml` runs on `pull_request`, receives the App key as the secret `APP_PRIVATE_KEY` (callers pass their Dependabot secret `AUTOMERGE_APP_PRIVATE_KEY`), approves eligible pull requests and enables auto-merge with `gh pr merge --auto --squash`. Existing callers keep working until they migrate. Do not use v1 in new setups.
