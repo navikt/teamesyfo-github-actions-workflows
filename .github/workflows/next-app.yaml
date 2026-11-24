@@ -66,7 +66,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: get-ingress
-        uses: mikefarah/yq@504fc38780cc46be8444ea1b72fb55919fc0bfb0 # v4.54.1
+        uses: mikefarah/yq@f2944b823f84906a127dbd29e4c2a3e60c4e550e # v4.54.3
         with:
           cmd: yq '.spec.ingresses[0]' nais/nais-dev.yaml
       - uses: nais/deploy/actions/deploy@8f89cfaf111e66bc79b75aa18a66a49fffb565ee # v3
@@ -162,7 +162,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: get-ingress
-        uses: mikefarah/yq@504fc38780cc46be8444ea1b72fb55919fc0bfb0 # v4.54.1
+        uses: mikefarah/yq@f2944b823f84906a127dbd29e4c2a3e60c4e550e # v4.54.3
         with:
           cmd: yq '.spec.ingresses[0]' nais/nais-prod.yaml
       - uses: nais/deploy/actions/deploy@8f89cfaf111e66bc79b75aa18a66a49fffb565ee # v3
