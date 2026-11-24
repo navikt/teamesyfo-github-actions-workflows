@@ -110,7 +110,7 @@ jobs:
     needs: [test, build]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: nais/deploy/actions/deploy@8f89cfaf111e66bc79b75aa18a66a49fffb565ee # v3
+      - uses: nais/deploy/actions/deploy@427e29c94d911626a023a76f402f6dcae1f840b7 # v3
         env:
           CLUSTER: dev-gcp
           RESOURCE: nais/nais-dev.yaml
@@ -123,7 +123,7 @@ jobs:
     needs: [test, build]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: nais/deploy/actions/deploy@8f89cfaf111e66bc79b75aa18a66a49fffb565ee # v3
+      - uses: nais/deploy/actions/deploy@427e29c94d911626a023a76f402f6dcae1f840b7 # v3
         env:
           CLUSTER: prod-gcp
           RESOURCE: nais/nais-prod.yaml
