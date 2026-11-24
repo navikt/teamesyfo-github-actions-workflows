@@ -1,0 +1,16 @@
+name: Dependabot auto-approve and auto-merge (this repo)
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  automerge:
+    permissions:
+      contents: write
+      pull-requests: write
+    # Self-repository reference: pinning this repo's own SHA would make
+    # Dependabot open a new bump PR after every merge.
+    uses: $/.github/workflows/dependabot-automerge.yaml
+    secrets:
+      APP_PRIVATE_KEY: ${{ secrets.AUTOMERGE_APP_PRIVATE_KEY }}
