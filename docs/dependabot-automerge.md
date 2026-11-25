@@ -120,6 +120,7 @@ jobs:
 ```
 
 - Pin the workflow to a full commit SHA. The workflow uses the App key, so a change on `main` in this repository should not reach your repository before you update the pin.
+- Add the caller only after you have created and tested the environment (steps 2–4 in the [quick start](#quick-start)). If the environment does not exist when the workflow runs, GitHub creates it without protection rules.
 - The caller must pass the secret by name, although the secret only exists in the environment. The environment secret takes precedence.
 - To turn off the Copilot review, add `with: copilot-review: false` to the job.
 - Scheduled workflows run only on the default branch. In a public repository, GitHub disables scheduled workflows after 60 days without activity. Enable the workflow again in the Actions tab if that happens.
@@ -153,8 +154,8 @@ To give Copilot the same review rules as other Team eSyfo repositories, copy [`d
 ## Migrate from v1
 
 1. Do steps 2–7 in the [quick start](#quick-start): create and test the environment, add the environment secret, turn off **Allow GitHub Actions to create and approve pull requests**, and add a required status check.
-2. Replace the caller workflow with the [v2 caller](#caller-workflow). Remove the `pull_request` trigger.
-3. Delete the Dependabot secret `AUTOMERGE_APP_PRIVATE_KEY`, and any repository secret that contains the App key.
+2. Delete the Dependabot secret `AUTOMERGE_APP_PRIVATE_KEY`, and any repository secret that contains the App key. Do this before the next step, because the v2 caller would otherwise pass a repository secret to the workflow if the environment secret is missing.
+3. Replace the caller workflow with the [v2 caller](#caller-workflow). Remove the `pull_request` trigger.
 4. On open Dependabot pull requests, turn off the auto-merge that v1 enabled, and dismiss the approvals from `github-actions[bot]`. v2 dismisses only approvals from the App, so an old approval from v1 still counts as the required review, also for a later commit. Run this from a clone of the repository, as a user who can dismiss reviews:
 
    ```bash
