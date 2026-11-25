@@ -1,22 +1,24 @@
 name: Test actions
 
 # Runs without secrets and with a read-only token, also for Dependabot PRs.
-# It gives every pull request in this repository a successful check, which
-# dependabot-automerge-v2.yaml requires before it merges.
+# Make "Unit tests" a required status check on main:
+# dependabot-automerge-v2.yaml merges nothing without a required check.
 
 on:
   pull_request:
+  merge_group:
   push:
     branches: [main]
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   test:
     name: Unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

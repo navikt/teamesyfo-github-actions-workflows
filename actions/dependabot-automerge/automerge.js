@@ -29,6 +29,8 @@ function unquote(value) {
 
 // Reads the YAML block that Dependabot appends to its commit message. Only the
 // last block counts, because the release notes above it may quote other blocks.
+// A block with a line or an entry that it does not understand gives null, so
+// the update needs a manual review.
 function parseUpdatedDependencies(message) {
   const start = message.lastIndexOf(METADATA_START)
   if (start === -1) return null
@@ -38,8 +40,9 @@ function parseUpdatedDependencies(message) {
 
   const dependencies = []
   for (const line of rest.slice(0, end).split('\n')) {
+    if (line.trim() === '') continue
     const entry = /^(- |  )([a-z-]+):(.*)$/.exec(line)
-    if (!entry) continue
+    if (!entry) return null
     if (entry[1] === '- ') dependencies.push({})
     const current = dependencies[dependencies.length - 1]
     if (!current) return null
@@ -48,7 +51,8 @@ function parseUpdatedDependencies(message) {
     if (entry[2] === 'dependency-version') current.version = value
     if (entry[2] === 'update-type') current.updateType = value
   }
-  return dependencies.length > 0 ? dependencies : null
+  if (dependencies.length === 0 || dependencies.some((dependency) => !dependency.name)) return null
+  return dependencies
 }
 
 function ecosystemFromBranch(ref) {
@@ -60,7 +64,7 @@ function decidePolicy({ ecosystem, dependencies }) {
   if (ecosystem === 'github_actions') {
     return { automerge: true, reason: 'GitHub Actions updates are always automerged' }
   }
-  if (!dependencies) {
+  if (!dependencies?.length) {
     return { automerge: false, reason: 'the commit has no Dependabot metadata' }
   }
   const blocking = dependencies.find((dependency) => !AUTOMERGEABLE_UPDATE_TYPES.has(dependency.updateType))
@@ -114,6 +118,26 @@ function summarizeChecks({ checkRuns, combinedStatus, workflowRuns }) {
   return { state: 'success', reason: 'all checks are green' }
 }
 
+const PASSING_REQUIRED_RESULTS = new Set(['SUCCESS', 'NEUTRAL', 'SKIPPED'])
+
+// The repository decides which checks are required. A required check that has
+// not started yet is missing from the list, so GitHub still enforces it when
+// the workflow merges.
+function summarizeRequiredChecks({ headSha, commit }) {
+  if (commit?.oid !== headSha) return { state: 'blocked', reason: 'the required checks are not for the head commit' }
+  const contexts = commit.statusCheckRollup?.contexts
+  if (contexts?.pageInfo?.hasNextPage) return { state: 'blocked', reason: 'the head commit has more than 100 checks' }
+  const required = (contexts?.nodes ?? []).filter((node) => node.isRequired === true)
+  if (required.length === 0) return { state: 'blocked', reason: 'no required check has reported' }
+  for (const node of required) {
+    const result = node.__typename === 'CheckRun' && node.status === 'COMPLETED' ? node.conclusion : (node.state ?? node.status)
+    if (!PASSING_REQUIRED_RESULTS.has(result)) {
+      return { state: 'blocked', reason: `required check "${node.name ?? node.context}" is ${String(result).toLowerCase()}` }
+    }
+  }
+  return { state: 'success', reason: 'all required checks passed' }
+}
+
 // Scheduled merges pause on weekends, 1 May, 17 May and 24 December to 1 January.
 function isMergeWindowOpen(date) {
   const parts = Object.fromEntries(OSLO_DATE.formatToParts(date).map((part) => [part.type, part.value]))
@@ -124,7 +148,9 @@ function isMergeWindowOpen(date) {
   return true
 }
 
-const APPROVER_LOGIN = 'github-actions[bot]'
+// The teamesyfo-automerge App approves and merges. GITHUB_TOKEN only reads,
+// requests Copilot reviews and dismisses approvals.
+const APPROVER_LOGIN = 'teamesyfo-automerge[bot]'
 const COPILOT_REVIEWER = 'copilot-pull-request-reviewer[bot]'
 const COPILOT_LOGINS = new Set([COPILOT_REVIEWER, 'Copilot'])
 const DECISIVE_REVIEW_STATES = new Set(['APPROVED', 'CHANGES_REQUESTED', 'DISMISSED'])
@@ -137,6 +163,10 @@ function hasChangesRequested(reviews) {
     if (review.user && DECISIVE_REVIEW_STATES.has(review.state)) latestByUser.set(review.user.login, review.state)
   }
   return [...latestByUser.values()].includes('CHANGES_REQUESTED')
+}
+
+function isAppApproval(review) {
+  return review.user?.login === APPROVER_LOGIN && review.state === 'APPROVED'
 }
 
 function dependencyFingerprint(dependencies) {
@@ -155,11 +185,13 @@ function isDependabotPullRequest(pull) {
   )
 }
 
-async function evaluateAndApprove({ github, context, core, now = new Date(), copilotReview = true }) {
+// Runs with GITHUB_TOKEN and never approves. The output lists each pull request
+// that is ready to merge, bound to the head commit that passed every gate.
+async function findMergeCandidates({ github, context, core, now = new Date(), copilotReview = true }) {
   const { owner, repo } = context.repo
   const { data: repository } = await github.rest.repos.get({ owner, repo })
   const windowOpen = context.eventName !== 'schedule' || isMergeWindowOpen(now)
-  if (!windowOpen) core.info('The merge window is closed. This run approves no pull requests.')
+  if (!windowOpen) core.info('The merge window is closed. This run merges no pull requests.')
 
   const pulls = await github.paginate(github.rest.pulls.list, {
     owner,
@@ -168,97 +200,100 @@ async function evaluateAndApprove({ github, context, core, now = new Date(), cop
     base: repository.default_branch,
     per_page: 100,
   })
-  const approved = []
+  const candidates = []
   for (const pull of pulls.filter(isDependabotPullRequest)) {
     const api = { github, owner, repo, pull_number: pull.number }
     const log = (message) => core.info(`PR #${pull.number}: ${message}`)
     try {
-      const result = await evaluatePullRequest({ api, core, log, pull, windowOpen, copilotReview })
-      if (result) approved.push(result)
+      const candidate = await evaluatePullRequest({ api, core, log, pull, windowOpen, copilotReview })
+      if (candidate) candidates.push(candidate)
     } catch (error) {
       core.warning(`PR #${pull.number}: evaluation failed: ${error.message}`)
     }
   }
-  core.setOutput('approved', JSON.stringify(approved))
-  return approved
+  core.setOutput('candidates', JSON.stringify(candidates))
+  return candidates
 }
 
 async function evaluatePullRequest({ api, core, log, pull, windowOpen, copilotReview }) {
   const { github, owner, repo, pull_number } = api
   const headSha = pull.head.sha
   const reviews = await github.paginate(github.rest.pulls.listReviews, { owner, repo, pull_number, per_page: 100 })
-  await dismissStaleApprovals({ api, core, reviews, headSha })
+  if (!(await dismissStaleApprovals({ api, core, reviews, headSha }))) {
+    return skip(log, 'a stale approval could not be dismissed')
+  }
 
   const commits = await github.paginate(github.rest.pulls.listCommits, { owner, repo, pull_number, per_page: 100 })
   const headCommit = commits.find((commit) => commit.sha === headSha)
   const dependencies = headCommit ? parseUpdatedDependencies(headCommit.commit.message) : null
-  const policy = decidePolicy({ ecosystem: ecosystemFromBranch(pull.head.ref), dependencies })
-  if (!policy.automerge) {
-    log(`needs a manual review, because ${policy.reason}`)
+  const manualReview = async (reason) => {
+    log(`needs a manual review, because ${reason}`)
     if (copilotReview) await requestCopilotReview({ api, core, log, reviews, headSha, dependencies })
     return null
   }
 
+  const policy = decidePolicy({ ecosystem: ecosystemFromBranch(pull.head.ref), dependencies })
+  if (!policy.automerge) return manualReview(policy.reason)
   if (pull.draft) return skip(log, 'is a draft')
   const provenance = checkProvenance({ headSha, commits })
-  if (!provenance.ok) return skip(log, provenance.reason)
-  if (hasChangesRequested(reviews)) return skip(log, 'a reviewer has requested changes')
+  if (!provenance.ok) return manualReview(provenance.reason)
 
-  const { data: details } = await github.rest.pulls.get({ owner, repo, pull_number })
-  if (details.head.sha !== headSha) return skip(log, 'the head changed during the evaluation')
-  if (details.mergeable !== true) {
-    return skip(log, details.mergeable === false ? 'has a merge conflict' : 'GitHub has not computed mergeability yet')
-  }
-
-  const checks = summarizeChecks(await readChecks({ api, headSha }))
-  if (checks.state !== 'success') return skip(log, checks.reason)
-  if (!windowOpen) return skip(log, 'is ready, but the merge window is closed')
-
-  const alreadyApproved = reviews.some(
-    (review) => review.user?.login === APPROVER_LOGIN && review.state === 'APPROVED' && review.commit_id === headSha,
-  )
-  let approval = null
-  if (!alreadyApproved) {
-    ;({ data: approval } = await github.rest.pulls.createReview({
-      owner,
-      repo,
-      pull_number,
-      event: 'APPROVE',
-      commit_id: headSha,
-      body: `Approved automatically for commit ${headSha}: ${policy.reason}, ${provenance.reason}, ${checks.reason}.`,
-    }))
-  }
-
-  const { data: after } = await github.rest.pulls.get({ owner, repo, pull_number })
-  if (after.state !== 'open' || after.head.sha !== headSha) {
-    if (approval) await dismissApproval({ api, core, reviewId: approval.id, message: 'The PR changed after approval.' })
-    return skip(log, 'changed after approval')
-  }
-  log(`approved commit ${headSha}`)
+  const gates = await checkMergeGates({ api, headSha })
+  if (!gates.ok) return skip(log, gates.reason)
+  if (!windowOpen) return skip(log, 'the merge window is closed')
+  log(`ready to merge commit ${headSha}`)
   return { number: pull_number, headSha }
 }
 
 function skip(log, reason) {
-  log(`not approved: ${reason}`)
+  log(`not ready: ${reason}`)
   return null
 }
 
-// Consumers do not dismiss stale approvals, so a bot approval of an old commit
-// would still count when a human merges a newer one.
-async function dismissStaleApprovals({ api, core, reviews, headSha }) {
-  for (const review of reviews) {
-    if (review.user?.login === APPROVER_LOGIN && review.state === 'APPROVED' && review.commit_id !== headSha) {
-      await dismissApproval({ api, core, reviewId: review.id, message: 'The approved commit is no longer the head.' })
-    }
+// Reads fresh data every time, because a pull request can change between the
+// two steps. Policy and provenance need no new check: they depend only on the
+// head commit, and every gate binds to it.
+async function checkMergeGates({ api, headSha }) {
+  const { github, owner, repo, pull_number } = api
+  const blocked = (reason) => ({ ok: false, reason })
+  const { data: pull } = await github.rest.pulls.get({ owner, repo, pull_number })
+  if (pull.state !== 'open') return blocked('the PR is not open')
+  if (pull.draft) return blocked('the PR is a draft')
+  if (pull.base.ref !== pull.base.repo.default_branch) return blocked('the PR does not target the default branch')
+  if (pull.head.sha !== headSha) return blocked('the head commit changed')
+  if (pull.mergeable !== true) {
+    return blocked(pull.mergeable === false ? 'has a merge conflict' : 'GitHub has not computed mergeability yet')
   }
+
+  const reviews = await github.paginate(github.rest.pulls.listReviews, { owner, repo, pull_number, per_page: 100 })
+  if (hasChangesRequested(reviews)) return blocked('a reviewer has requested changes')
+  const checks = summarizeChecks(await readChecks({ api, headSha }))
+  if (checks.state !== 'success') return blocked(checks.reason)
+  const required = summarizeRequiredChecks({ headSha, commit: await readRequiredChecks({ api }) })
+  if (required.state !== 'success') return blocked(required.reason)
+  return { ok: true, reason: `${checks.reason} and ${required.reason}`, reviews }
+}
+
+// Consumers do not dismiss stale approvals, so an App approval of an old commit
+// would still count when a human merges a newer one. Returns false when an
+// approval remains.
+async function dismissStaleApprovals({ api, core, reviews, headSha }) {
+  let dismissedAll = true
+  for (const review of reviews.filter((review) => isAppApproval(review) && review.commit_id !== headSha)) {
+    const message = 'The approved commit is no longer the head.'
+    if (!(await dismissApproval({ api, core, reviewId: review.id, message }))) dismissedAll = false
+  }
+  return dismissedAll
 }
 
 async function dismissApproval({ api, core, reviewId, message }) {
   const { github, owner, repo, pull_number } = api
   try {
     await github.rest.pulls.dismissReview({ owner, repo, pull_number, review_id: reviewId, message })
+    return true
   } catch (error) {
     core.warning(`PR #${pull_number}: could not dismiss approval ${reviewId}: ${error.message}`)
+    return false
   }
 }
 
@@ -275,6 +310,12 @@ async function readChecks({ api, headSha }) {
   return { checkRuns, combinedStatus, workflowRuns }
 }
 
+async function readRequiredChecks({ api }) {
+  const { github, owner, repo, pull_number } = api
+  const { repository } = await github.graphql(REQUIRED_CHECKS_QUERY, { owner, repo, number: pull_number })
+  return repository.pullRequest.commits.nodes[0]?.commit
+}
+
 // Requests at most one Copilot review per set of dependency versions, so a
 // Dependabot rebase does not start a new review.
 async function requestCopilotReview({ api, core, log, reviews, headSha, dependencies }) {
@@ -283,9 +324,13 @@ async function requestCopilotReview({ api, core, log, reviews, headSha, dependen
     const { data: requested } = await github.rest.pulls.listRequestedReviewers({ owner, repo, pull_number })
     if (requested.users.some((user) => COPILOT_LOGINS.has(user.login))) return
 
-    const latest = reviews.filter((review) => COPILOT_LOGINS.has(review.user?.login)).at(-1)
-    if (latest?.commit_id === headSha) return
-    if (latest && (await reviewedSameVersions({ api, log, commitId: latest.commit_id, dependencies }))) return
+    const reviewedCommits = new Set(
+      reviews.filter((review) => COPILOT_LOGINS.has(review.user?.login)).map((review) => review.commit_id),
+    )
+    if (reviewedCommits.has(headSha)) return
+    for (const commitId of reviewedCommits) {
+      if (await reviewedSameVersions({ api, log, commitId, dependencies })) return
+    }
 
     await github.rest.pulls.requestReviewers({ owner, repo, pull_number, reviewers: [COPILOT_REVIEWER] })
     log('requested a Copilot review')
@@ -306,6 +351,31 @@ async function reviewedSameVersions({ api, log, commitId, dependencies }) {
     return false
   }
 }
+
+const REQUIRED_CHECKS_QUERY = `
+  query ($owner: String!, $repo: String!, $number: Int!) {
+    repository(owner: $owner, name: $repo) {
+      pullRequest(number: $number) {
+        commits(last: 1) {
+          nodes {
+            commit {
+              oid
+              statusCheckRollup {
+                contexts(first: 100) {
+                  pageInfo { hasNextPage }
+                  nodes {
+                    __typename
+                    ... on CheckRun { name status conclusion isRequired(pullRequestNumber: $number) }
+                    ... on StatusContext { context state isRequired(pullRequestNumber: $number) }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }`
 
 const PULL_REQUEST_QUERY = `
   query ($owner: String!, $repo: String!, $number: Int!) {
@@ -330,20 +400,57 @@ const ENQUEUE_MUTATION = `
     }
   }`
 
-// Merges only the exact commit that evaluateAndApprove approved. Errors become
-// warnings without a fallback, so a failed merge leaves the PR for the next run.
-async function merge({ github, context, core, approved }) {
+// Approves and merges only the exact commit that findMergeCandidates selected,
+// after a fresh check of every gate. github is GITHUB_TOKEN; appGithub is the
+// App, whose approval counts as the required review. Errors become warnings
+// without a fallback, so a pull request that fails waits for the next run.
+async function approveAndMerge({ github, appGithub, appSlug, context, core, candidates }) {
+  if (`${appSlug}[bot]` !== APPROVER_LOGIN) {
+    core.setFailed(`The App token belongs to "${appSlug}", but the workflow expects ${APPROVER_LOGIN}.`)
+    return
+  }
+  if (!Array.isArray(candidates)) {
+    core.setFailed('The list of pull requests to merge is not an array.')
+    return
+  }
   const { owner, repo } = context.repo
-  for (const entry of approved) {
-    if (!Number.isInteger(entry?.number) || !SHA.test(entry?.headSha ?? '')) {
-      core.warning(`Skipped an invalid entry: ${JSON.stringify(entry)}`)
+  for (const candidate of candidates) {
+    if (!Number.isInteger(candidate?.number) || !SHA.test(candidate?.headSha ?? '')) {
+      core.warning(`Skipped an invalid candidate: ${JSON.stringify(candidate)}`)
       continue
     }
+    const api = { github, owner, repo, pull_number: candidate.number }
     try {
-      await mergePullRequest({ github, core, owner, repo, ...entry })
+      await approveAndMergePullRequest({ api, appGithub, core, headSha: candidate.headSha })
     } catch (error) {
-      core.warning(`PR #${entry.number}: not merged: ${error.message}`)
+      core.warning(`PR #${candidate.number}: not merged: ${error.message}`)
     }
+  }
+}
+
+async function approveAndMergePullRequest({ api, appGithub, core, headSha }) {
+  const { owner, repo, pull_number } = api
+  const gates = await checkMergeGates({ api, headSha })
+  if (!gates.ok) throw new Error(gates.reason)
+
+  let approval = null
+  if (!gates.reviews.some((review) => isAppApproval(review) && review.commit_id === headSha)) {
+    ;({ data: approval } = await appGithub.rest.pulls.createReview({
+      owner,
+      repo,
+      pull_number,
+      event: 'APPROVE',
+      commit_id: headSha,
+      body: `Approved automatically for commit ${headSha}: an untouched Dependabot update that the policy allows, ${gates.reason}.`,
+    }))
+    core.info(`PR #${pull_number}: approved commit ${headSha}`)
+  }
+
+  try {
+    await mergePullRequest({ github: appGithub, core, owner, repo, number: pull_number, headSha })
+  } catch (error) {
+    if (approval) await dismissApproval({ api, core, reviewId: approval.id, message: 'The merge failed after approval.' })
+    throw error
   }
 }
 
@@ -355,10 +462,7 @@ async function mergePullRequest({ github, core, owner, repo, number, headSha }) 
     (pull.isDraft && 'the PR is a draft') ||
     (pull.headRefOid !== headSha && 'the head changed after approval') ||
     (pull.baseRefName !== repository.defaultBranchRef.name && 'the PR does not target the default branch')
-  if (blocker) {
-    core.warning(`PR #${number}: not merged: ${blocker}`)
-    return
-  }
+  if (blocker) throw new Error(blocker)
 
   if (pull.isMergeQueueEnabled) {
     if (pull.isInMergeQueue) {
@@ -378,7 +482,8 @@ module.exports = {
   decidePolicy,
   checkProvenance,
   summarizeChecks,
+  summarizeRequiredChecks,
   isMergeWindowOpen,
-  evaluateAndApprove,
-  merge,
+  findMergeCandidates,
+  approveAndMerge,
 }

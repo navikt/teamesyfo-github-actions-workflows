@@ -10,6 +10,7 @@
   `refs/heads/gh-readonly-queue/`, samt actionens `publish-artifacts`-input.
 - Kontroller køkontrakten med
   `ruby .github/scripts/validate-next-app-queue-policy.rb`.
-- `actions/dependabot-automerge/automerge.js` godkjenner og merger med appens
-  nøkkel. Endre den testdrevet, og kjør
+- `actions/dependabot-automerge/automerge.js` finner klare PR-er med
+  `GITHUB_TOKEN`, som aldri godkjenner. Appen `teamesyfo-automerge` godkjenner
+  og merger. Endre den testdrevet, og kjør
   `node --test actions/dependabot-automerge/automerge.test.js`.

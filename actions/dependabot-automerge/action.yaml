@@ -6,7 +6,7 @@ description: >-
 
 inputs:
   app-private-key:
-    description: "Private key for the teamesyfo-automerge GitHub App. Only the merge step uses it."
+    description: "Private key for the teamesyfo-automerge GitHub App. Only the approve and merge step uses it."
     required: true
   copilot-review:
     description: "Request a comment-only Copilot review on updates that need a manual review."
@@ -14,15 +14,15 @@ inputs:
     default: "true"
 
 outputs:
-  approved:
-    description: "JSON list of the pull requests and head commits that this run approved."
-    value: ${{ steps.evaluate.outputs.approved }}
+  candidates:
+    description: "JSON list of the pull requests and head commits that were ready to merge when the run started."
+    value: ${{ steps.find.outputs.candidates }}
 
 runs:
   using: "composite"
   steps:
     # The App key comes from the dependabot-automerge environment. Stop before
-    # approving anything when the environment lacks it.
+    # doing anything when the environment lacks it.
     - name: Check the App key
       if: inputs.app-private-key == ''
       shell: bash
@@ -30,9 +30,10 @@ runs:
         echo "::error::The secret AUTOMERGE_APP_PRIVATE_KEY is empty. Add it to the dependabot-automerge environment."
         exit 1
 
-    # Uses the job's GITHUB_TOKEN, so the approval comes from github-actions[bot].
-    - name: Evaluate and approve Dependabot pull requests
-      id: evaluate
+    # Uses the job's GITHUB_TOKEN, which never approves. It only reads,
+    # requests Copilot reviews and dismisses stale App approvals.
+    - name: Find Dependabot pull requests that are ready to merge
+      id: find
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
         ACTION_PATH: ${{ github.action_path }}
@@ -40,18 +41,19 @@ runs:
       with:
         script: |
           const automerge = require(`${process.env.ACTION_PATH}/automerge.js`)
-          await automerge.evaluateAndApprove({
+          await automerge.findMergeCandidates({
             github,
             context,
             core,
             copilotReview: process.env.COPILOT_REVIEW === 'true',
           })
 
-    # An App token is needed because GITHUB_TOKEN can neither add pull requests
-    # to a merge queue nor trigger the workflows that run after a merge.
+    # The App approves, so its approval counts as the required review. It also
+    # merges, because GITHUB_TOKEN can neither add pull requests to a merge
+    # queue nor trigger the workflows that run after a merge.
     - name: Create GitHub App token
       id: app-token
-      if: steps.evaluate.outputs.approved != '[]'
+      if: steps.find.outputs.candidates != '' && steps.find.outputs.candidates != '[]'
       uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
       with:
         client-id: Iv23liqxZsjVqOVzo0se # teamesyfo-automerge (App ID 2906300)
@@ -59,14 +61,24 @@ runs:
         permission-contents: write
         permission-pull-requests: write
 
-    - name: Merge approved pull requests
-      if: steps.evaluate.outputs.approved != '[]'
+    # github stays GITHUB_TOKEN, so the fresh check of every gate and any
+    # dismissal use the same identity as the find step.
+    - name: Approve and merge Dependabot pull requests
+      if: steps.find.outputs.candidates != '' && steps.find.outputs.candidates != '[]'
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
         ACTION_PATH: ${{ github.action_path }}
-        APPROVED: ${{ steps.evaluate.outputs.approved }}
+        APP_TOKEN: ${{ steps.app-token.outputs.token }}
+        APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+        CANDIDATES: ${{ steps.find.outputs.candidates }}
       with:
-        github-token: ${{ steps.app-token.outputs.token }}
         script: |
           const automerge = require(`${process.env.ACTION_PATH}/automerge.js`)
-          await automerge.merge({ github, context, core, approved: JSON.parse(process.env.APPROVED) })
+          await automerge.approveAndMerge({
+            github,
+            appGithub: getOctokit(process.env.APP_TOKEN),
+            appSlug: process.env.APP_SLUG,
+            context,
+            core,
+            candidates: JSON.parse(process.env.CANDIDATES),
+          })
