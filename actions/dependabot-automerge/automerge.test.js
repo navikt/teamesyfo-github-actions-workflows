@@ -71,6 +71,12 @@ describe('parseUpdatedDependencies', () => {
   const malformed = [
     ['a line it does not recognise', '- dependency-name: a\n  update-type: version-update:semver-patch\n    nested: value'],
     ['an entry without a name', '- dependency-name: a\n- update-type: version-update:semver-patch'],
+    ['an entry without a version', '- dependency-name: a\n  update-type: version-update:semver-patch'],
+    ['a field before the first entry', '  update-type: version-update:semver-patch\n- dependency-name: a\n  dependency-version: 1.0.0'],
+    [
+      'an entry with two update types',
+      '- dependency-name: a\n  dependency-version: 2.0.0\n  update-type: version-update:semver-major\n  update-type: version-update:semver-patch',
+    ],
   ]
   for (const [name, block] of malformed) {
     it(`returns null for a block with ${name}`, () => {
@@ -447,10 +453,13 @@ describe('findMergeCandidates', () => {
     ['the same versions on an older commit', [copilotReview(older)], '1.0.1', 0],
     ['other versions on an older commit', [copilotReview(older)], '1.0.0', 1],
     ['the head commit before another commit', [copilotReview(HEAD), copilotReview(older)], '1.0.0', 0],
+    ['an older commit it cannot read', [copilotReview(older)], null, 0],
   ]
   for (const [name, reviews, olderVersion, expectedRequests] of reviewedEarlier) {
     it(`after a Copilot review of ${name}, requests ${expectedRequests} new review`, async () => {
-      const oldCommits = { [older]: dependabotMessage({ name: 'left-pad', version: olderVersion, updateType: MAJOR }) }
+      const oldCommits = olderVersion
+        ? { [older]: dependabotMessage({ name: 'left-pad', version: olderVersion, updateType: MAJOR }) }
+        : {}
       const { writes } = await find([dependabotPr({ updateType: MAJOR, reviews })], { oldCommits })
       assert.equal(writes.reviewRequests.length, expectedRequests)
     })
@@ -500,6 +509,11 @@ describe('approveAndMerge', () => {
       'the base branch changed',
       { base: { ref: 'release', repo: { full_name: 'navikt/app', default_branch: 'main' } } },
       'the PR does not target the default branch',
+    ],
+    [
+      'the PR got another commit below the head',
+      { commits: [{ ...dependabotPr().commits[0], sha: 'b'.repeat(40) }, ...dependabotPr().commits] },
+      'the PR has 2 commits, expected 1',
     ],
     ['a check failed', { checkRuns: [{ name: 'build', status: 'completed', conclusion: 'failure' }] }, 'concluded failure'],
     ['a reviewer requested changes', { reviews: [{ id: 1, user: { login: 'someone' }, state: 'CHANGES_REQUESTED' }] }, 'requested changes'],

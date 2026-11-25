@@ -28,7 +28,7 @@ v1 is deprecated. It runs on `pull_request` with the App key as a Dependabot sec
 4. Add the App private key as the **environment secret** `AUTOMERGE_APP_PRIVATE_KEY` in that environment. Do not store the key as a repository secret, an organization secret or a Dependabot secret.
 5. Turn off **Allow GitHub Actions to create and approve pull requests** in Settings -> Actions -> General, unless another workflow needs it. The App approves, not `GITHUB_TOKEN`. The default workflow permissions can stay read-only, because the workflow sets its own permissions.
 6. Allow squash merging in Settings -> General -> Pull Requests, unless the repository uses a merge queue.
-7. Add at least one required status check on the default branch, in a ruleset or in branch protection. The check must come from CI that runs on `pull_request`, and also on `merge_group` with a merge queue. The workflow merges nothing until the required checks have passed on the head commit.
+7. Add at least one required status check on the default branch, in a ruleset or in branch protection. The check must come from CI that runs on `pull_request`, and also on `merge_group` with a merge queue. The workflow merges nothing until the required checks have passed on the head commit. Do not add the App to a bypass list in any ruleset or branch protection rule, because GitHub must enforce the required checks when the App merges.
 8. Add the [caller workflow](#caller-workflow).
 9. Start the workflow manually on the default branch once, and read the job log.
 10. Optional: copy the [Copilot review instructions](#copilot-review-of-manual-updates).
@@ -40,9 +40,9 @@ v1 is deprecated. It runs on `pull_request` with the App key as a Dependabot sec
 | GitHub Actions | ✅ Yes | Includes major updates |
 | Patch or minor update in other ecosystems | ✅ Yes | All updates in a grouped PR must be patch or minor |
 | Major update in other ecosystems | ❌ No | Manual review, with an optional Copilot review |
-| Other ecosystems without Dependabot metadata in the commit | ❌ No | Manual review |
+| Other ecosystems without valid Dependabot metadata in the commit | ❌ No | Manual review |
 
-The ecosystem comes from the branch name (`dependabot/<ecosystem>/...`). The update types come from the metadata block that Dependabot adds to its commit message.
+The ecosystem comes from the branch name (`dependabot/<ecosystem>/...`). The update types come from the metadata block that Dependabot adds to its commit message. Every entry in the block must have a name and a version, and no field may occur twice in an entry. Otherwise the update needs a manual review.
 
 ## When the workflow approves and merges
 
@@ -188,8 +188,9 @@ Remaining risks:
 - Anyone who can push to the default branch can change the caller workflow and use the key, as with other secrets that only the default branch can use.
 - If someone pushes to a pull request that the App has approved, the App approval of the old commit still counts until the next run dismisses it. During that time, a human can merge the new commit without a new approval. If the workflow cannot dismiss the approval, it skips the pull request, and the approval stays until someone dismisses it. To close this gap, turn on **Dismiss stale pull request approvals when new commits are pushed**. Then every push to any pull request needs a new approval.
 - If only some people may dismiss reviews in the repository, `GITHUB_TOKEN` may not be allowed to dismiss approvals. Then the workflow skips pull requests with an App approval of an old commit, and a person must dismiss the approval.
-- A required check that has not started yet is not visible on the commit. The workflow then evaluates only the required checks that have reported, but GitHub still rejects the merge until every required check has passed.
-- The workflow reads which checks are required with `GITHUB_TOKEN`. This has not been verified in a consumer repository yet. If it does not work, the workflow merges nothing and logs `no required check has reported`.
+- A required check that has not started yet is not visible on the commit. The workflow then evaluates only the required checks that have reported, and relies on GitHub to reject the merge until every required check has passed. This works only when the App cannot bypass the rules. Team eSyfo verifies it once in a test repository: add a required check that never reports, start the workflow manually while a Dependabot pull request is ready, and confirm that GitHub does not merge the pull request.
+- The merge binds to the head commit, but GitHub cannot bind it to the base branch. The workflow checks the base branch just before it approves and again just before it merges. Someone who changes the base branch in the short time between that check and the merge can make the App merge the pull request into another branch. Changing the base branch requires write access to the repository.
+- The workflow reads which checks are required with `GITHUB_TOKEN`. This has not been verified in a consumer repository yet. If it does not work, the workflow merges nothing. The log then shows `not ready: no required check has reported`, or, if the lookup fails, `evaluation failed: ...` in the first step or `not merged: ...` in the second step.
 
 ## Troubleshooting
 
@@ -209,10 +210,10 @@ The job log has one line for each Dependabot pull request, such as `PR #12: not 
 | `not ready: GitHub has not computed mergeability yet` | Wait for the next run. |
 | `needs a manual review, because the PR has 2 commits, expected 1` or `... the committer is not GitHub` | Someone pushed to the Dependabot branch. Review the pull request manually, or comment `@dependabot recreate`. |
 | `not ready: a stale approval could not be dismissed` and `could not dismiss approval ...` | Dismiss the App approval of the old commit manually. Check whether the repository restricts who can dismiss reviews. |
-| `evaluation failed: ...` | Read the error. The next run tries again. |
-| `not merged: ...` | Check that the App has access to the repository, that squash merging is allowed, and see [Merge queue](#merge-queue). The next run tries again. |
+| `evaluation failed: ...` | Read the error. It can come from a failed lookup of the pull request or its checks. The next run tries again. |
+| `not merged: ...` | Check that the App has access to the repository, that squash merging is allowed, and see [Merge queue](#merge-queue). A failed lookup of the required checks also gives this message. The next run tries again. |
 | `Skipped an invalid candidate: ...` | This is an error in the workflow. Tell Team eSyfo. |
-| `could not request a Copilot review` | Check that the repository has access to Copilot code review, or set `copilot-review: false`. |
+| `could not request a Copilot review` | Check that the repository has access to Copilot code review, or set `copilot-review: false`. If the message says `could not read commit ...`, the workflow could not compare the versions with an earlier Copilot review. It tries again on the next run. |
 
 ## v1 (deprecated)
 

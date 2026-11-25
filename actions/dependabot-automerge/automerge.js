@@ -20,6 +20,7 @@ const OSLO_DATE = new Intl.DateTimeFormat('en-CA', {
 
 const METADATA_START = '\n---\nupdated-dependencies:\n'
 const METADATA_END = /\n\.\.\.(\n|$)/
+const METADATA_FIELDS = { 'dependency-name': 'name', 'dependency-version': 'version', 'update-type': 'updateType' }
 
 function unquote(value) {
   const trimmed = value.trim()
@@ -29,8 +30,8 @@ function unquote(value) {
 
 // Reads the YAML block that Dependabot appends to its commit message. Only the
 // last block counts, because the release notes above it may quote other blocks.
-// A block with a line or an entry that it does not understand gives null, so
-// the update needs a manual review.
+// A line it does not understand, a repeated field or an entry without a name
+// or a version gives null, so the update needs a manual review.
 function parseUpdatedDependencies(message) {
   const start = message.lastIndexOf(METADATA_START)
   if (start === -1) return null
@@ -39,19 +40,24 @@ function parseUpdatedDependencies(message) {
   if (end === -1) return null
 
   const dependencies = []
+  let keys = null
   for (const line of rest.slice(0, end).split('\n')) {
     if (line.trim() === '') continue
     const entry = /^(- |  )([a-z-]+):(.*)$/.exec(line)
     if (!entry) return null
-    if (entry[1] === '- ') dependencies.push({})
-    const current = dependencies[dependencies.length - 1]
-    if (!current) return null
-    const value = unquote(entry[3])
-    if (entry[2] === 'dependency-name') current.name = value
-    if (entry[2] === 'dependency-version') current.version = value
-    if (entry[2] === 'update-type') current.updateType = value
+    const [, indent, key, value] = entry
+    if (indent === '- ') {
+      dependencies.push({})
+      keys = new Set()
+    }
+    if (!keys || keys.has(key)) return null
+    keys.add(key)
+    const field = METADATA_FIELDS[key]
+    if (field) dependencies[dependencies.length - 1][field] = unquote(value)
   }
-  if (dependencies.length === 0 || dependencies.some((dependency) => !dependency.name)) return null
+  if (dependencies.length === 0 || dependencies.some((dependency) => !dependency.name || !dependency.version)) {
+    return null
+  }
   return dependencies
 }
 
@@ -251,8 +257,7 @@ function skip(log, reason) {
 }
 
 // Reads fresh data every time, because a pull request can change between the
-// two steps. Policy and provenance need no new check: they depend only on the
-// head commit, and every gate binds to it.
+// two steps.
 async function checkMergeGates({ api, headSha }) {
   const { github, owner, repo, pull_number } = api
   const blocked = (reason) => ({ ok: false, reason })
@@ -317,7 +322,8 @@ async function readRequiredChecks({ api }) {
 }
 
 // Requests at most one Copilot review per set of dependency versions, so a
-// Dependabot rebase does not start a new review.
+// Dependabot rebase does not start a new review. When it cannot read a commit
+// that Copilot reviewed, it requests nothing and tries again on the next run.
 async function requestCopilotReview({ api, core, log, reviews, headSha, dependencies }) {
   const { github, owner, repo, pull_number } = api
   try {
@@ -329,7 +335,7 @@ async function requestCopilotReview({ api, core, log, reviews, headSha, dependen
     )
     if (reviewedCommits.has(headSha)) return
     for (const commitId of reviewedCommits) {
-      if (await reviewedSameVersions({ api, log, commitId, dependencies })) return
+      if (await reviewedSameVersions({ api, commitId, dependencies })) return
     }
 
     await github.rest.pulls.requestReviewers({ owner, repo, pull_number, reviewers: [COPILOT_REVIEWER] })
@@ -339,17 +345,17 @@ async function requestCopilotReview({ api, core, log, reviews, headSha, dependen
   }
 }
 
-async function reviewedSameVersions({ api, log, commitId, dependencies }) {
+async function reviewedSameVersions({ api, commitId, dependencies }) {
   const current = dependencyFingerprint(dependencies)
   if (!current) return false
+  const { github, owner, repo } = api
+  let reviewed
   try {
-    const { github, owner, repo } = api
-    const { data } = await github.rest.repos.getCommit({ owner, repo, ref: commitId })
-    return dependencyFingerprint(parseUpdatedDependencies(data.commit.message)) === current
+    ;({ data: reviewed } = await github.rest.repos.getCommit({ owner, repo, ref: commitId }))
   } catch (error) {
-    log(`could not read the commit Copilot reviewed: ${error.message}`)
-    return false
+    throw new Error(`could not read commit ${commitId}, which Copilot reviewed: ${error.message}`)
   }
+  return dependencyFingerprint(parseUpdatedDependencies(reviewed.commit.message)) === current
 }
 
 const REQUIRED_CHECKS_QUERY = `
@@ -428,10 +434,16 @@ async function approveAndMerge({ github, appGithub, appSlug, context, core, cand
   }
 }
 
+// The policy depends only on the head commit, which every write binds to. The
+// list of commits also depends on the base branch, so provenance is checked
+// again here.
 async function approveAndMergePullRequest({ api, appGithub, core, headSha }) {
-  const { owner, repo, pull_number } = api
+  const { github, owner, repo, pull_number } = api
   const gates = await checkMergeGates({ api, headSha })
   if (!gates.ok) throw new Error(gates.reason)
+  const commits = await github.paginate(github.rest.pulls.listCommits, { owner, repo, pull_number, per_page: 100 })
+  const provenance = checkProvenance({ headSha, commits })
+  if (!provenance.ok) throw new Error(provenance.reason)
 
   let approval = null
   if (!gates.reviews.some((review) => isAppApproval(review) && review.commit_id === headSha)) {
