@@ -326,8 +326,10 @@ async function readRequiredChecks({ api }) {
 }
 
 // Requests at most one Copilot review per set of dependency versions, so a
-// Dependabot rebase does not start a new review. When it cannot read a commit
-// that Copilot reviewed, it requests nothing and tries again on the next run.
+// Dependabot rebase does not start a new review. A request that someone
+// removes before Copilot reviews leaves no trace, so it is requested again.
+// When it cannot read a commit that Copilot reviewed, it requests nothing and
+// tries again on the next run.
 // It reads the reviews after the pending requests, so a review that Copilot
 // submits between the two reads is still seen.
 async function requestCopilotReview({ api, core, log, headSha, dependencies }) {

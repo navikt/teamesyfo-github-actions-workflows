@@ -145,7 +145,7 @@ Without a merge queue, the workflow merges directly. Then:
 
 ## Copilot review of manual updates
 
-For updates that need a manual review, the workflow requests a review from Copilot. This applies to updates that the [policy](#policy) does not allow, such as major updates, and to pull requests where someone other than Dependabot has pushed to the branch. It requests at most one review per set of dependency versions, so a Dependabot rebase does not start a new review. The repository must have access to Copilot code review. Otherwise the job log shows a warning.
+For updates that need a manual review, the workflow requests a review from Copilot. This applies to updates that the [policy](#policy) does not allow, such as major updates, and to pull requests where someone other than Dependabot has pushed to the branch. It requests at most one review per set of dependency versions, so a Dependabot rebase does not start a new review. There is one exception: if someone removes the Copilot review request before Copilot has reviewed, the next run requests the review again. To stop the reviews in a repository, add `with: copilot-review: false` to the caller job. The repository must have access to Copilot code review. Otherwise the job log shows a warning.
 
 Copilot reviews with comments only. A human must review and merge the pull request.
 
