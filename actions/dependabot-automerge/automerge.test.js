@@ -72,6 +72,9 @@ describe('parseUpdatedDependencies', () => {
     ['a line it does not recognise', '- dependency-name: a\n  update-type: version-update:semver-patch\n    nested: value'],
     ['an entry without a name', '- dependency-name: a\n- update-type: version-update:semver-patch'],
     ['an entry without a version', '- dependency-name: a\n  update-type: version-update:semver-patch'],
+    ['a blank quoted name', '- dependency-name: "  "\n  dependency-version: 1.0.0\n  update-type: version-update:semver-patch'],
+    ['a null version', '- dependency-name: a\n  dependency-version: null\n  update-type: version-update:semver-patch'],
+    ['a tilde name', '- dependency-name: ~\n  dependency-version: 1.0.0\n  update-type: version-update:semver-patch'],
     ['a field before the first entry', '  update-type: version-update:semver-patch\n- dependency-name: a\n  dependency-version: 1.0.0'],
     [
       'an entry with two update types',
@@ -250,6 +253,7 @@ function fakeGitHub({
   mergeQueue = false,
   oldCommits = {},
   onApprove,
+  onListRequestedReviewers,
   failMergeQueueLookup = false,
   failDismissal = false,
   failMerge = false,
@@ -314,10 +318,11 @@ function fakeGitHub({
         list: async () => ({ data: pulls.filter((p) => p.state === 'open') }),
         get: async ({ pull_number }) => ({ data: pr(pull_number) }),
         listCommits: async ({ pull_number }) => ({ data: pr(pull_number).commits }),
-        listReviews: async ({ pull_number }) => ({ data: pr(pull_number).reviews }),
-        listRequestedReviewers: async ({ pull_number }) => ({
-          data: { users: pr(pull_number).requestedReviewers, teams: [] },
-        }),
+        listReviews: async ({ pull_number }) => ({ data: [...pr(pull_number).reviews] }),
+        listRequestedReviewers: async ({ pull_number }) => {
+          onListRequestedReviewers?.(pr(pull_number))
+          return { data: { users: [...pr(pull_number).requestedReviewers], teams: [] } }
+        },
         requestReviewers: async ({ pull_number, reviewers }) => {
           writes.reviewRequests.push({ by: login, number: pull_number, reviewers })
           pr(pull_number).requestedReviewers.push({ login: 'Copilot' })
@@ -464,6 +469,18 @@ describe('findMergeCandidates', () => {
       assert.equal(writes.reviewRequests.length, expectedRequests)
     })
   }
+
+  it('does not request Copilot again when it submits its pending review just before the requests are read', async () => {
+    const submitPendingCopilotReview = (pull) => {
+      if (pull.requestedReviewers.length === 0) return
+      pull.requestedReviewers = []
+      pull.reviews.push(copilotReview(HEAD))
+    }
+    const { writes } = await find([dependabotPr({ updateType: MAJOR, requestedReviewers: [{ login: 'Copilot' }] })], {
+      onListRequestedReviewers: submitPendingCopilotReview,
+    })
+    assert.deepEqual(writes.reviewRequests, [])
+  })
 
   it('does not request Copilot when the caller opts out', async () => {
     const { writes } = await find([dependabotPr({ updateType: MAJOR })], { copilotReview: false })

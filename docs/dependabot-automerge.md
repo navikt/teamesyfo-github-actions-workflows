@@ -42,7 +42,7 @@ v1 is deprecated. It runs on `pull_request` with the App key as a Dependabot sec
 | Major update in other ecosystems | ❌ No | Manual review, with an optional Copilot review |
 | Other ecosystems without valid Dependabot metadata in the commit | ❌ No | Manual review |
 
-The ecosystem comes from the branch name (`dependabot/<ecosystem>/...`). The update types come from the metadata block that Dependabot adds to its commit message. Every entry in the block must have a name and a version, and no field may occur twice in an entry. Otherwise the update needs a manual review.
+The ecosystem comes from the branch name (`dependabot/<ecosystem>/...`). The update types come from the metadata block that Dependabot adds to its commit message. Every entry in the block must have a name and a version that are not empty or `null`, and no field may occur twice in an entry. Otherwise the update needs a manual review.
 
 ## When the workflow approves and merges
 
@@ -69,7 +69,7 @@ This step never approves. It dismisses approvals from the App of commits that ar
    - With a merge queue, it adds the pull request to the queue with `expectedHeadOid`, so GitHub rejects it if the head has changed.
    - Without a merge queue, it squash-merges with the `sha` of the approved commit, so GitHub rejects the merge if the head has changed.
 
-If the merge fails, the workflow dismisses the new approval, the job log shows a warning, and the next run tries again. The workflow does not fall back to another merge method, and it never checks out or runs code from a pull request.
+If the merge fails, the workflow tries to dismiss the new approval, the job log shows a warning, and the next run tries again. If the dismissal also fails, the approval stays until someone dismisses it (see [Troubleshooting](#troubleshooting)). The workflow does not fall back to another merge method, and it never checks out or runs code from a pull request.
 
 ```mermaid
 flowchart TD
@@ -86,7 +86,7 @@ flowchart TD
     G --> K{Merge queue?}
     K -->|Yes| L[Add to the queue with expectedHeadOid]
     K -->|No| M[Squash-merge with sha]
-    L -->|Fails| I[Dismiss the new approval]
+    L -->|Fails| I[Try to dismiss the new approval]
     M -->|Fails| I
 ```
 
@@ -140,7 +140,7 @@ The App token is needed for the queue, because `GITHUB_TOKEN` cannot add pull re
 Without a merge queue, the workflow merges directly. Then:
 
 - If the branch must be up to date before merging, the merge fails until Dependabot rebases the pull request.
-- A pull request that changes files in `.github/workflows/` may need the `workflows` permission, which the App does not have. This has not been verified yet. If the merge fails, the workflow dismisses its approval, the job log shows a warning and the pull request stays open. A merge queue avoids the problem.
+- A pull request that changes files in `.github/workflows/` may need the `workflows` permission, which the App does not have. This has not been verified yet. If the merge fails, the workflow tries to dismiss its approval, the job log shows a warning and the pull request stays open. A merge queue avoids the problem.
 
 ## Copilot review of manual updates
 
@@ -209,7 +209,7 @@ The job log has one line for each Dependabot pull request, such as `PR #12: not 
 | `not ready: check "..." concluded cancelled` | Run the check again. |
 | `not ready: GitHub has not computed mergeability yet` | Wait for the next run. |
 | `needs a manual review, because the PR has 2 commits, expected 1` or `... the committer is not GitHub` | Someone pushed to the Dependabot branch. Review the pull request manually, or comment `@dependabot recreate`. |
-| `not ready: a stale approval could not be dismissed` and `could not dismiss approval ...` | Dismiss the App approval of the old commit manually. Check whether the repository restricts who can dismiss reviews. |
+| `not ready: a stale approval could not be dismissed` and `could not dismiss approval ...` | Dismiss the App approval manually. After `not merged: ...`, this is the approval of the current commit. Check whether the repository restricts who can dismiss reviews. |
 | `evaluation failed: ...` | Read the error. It can come from a failed lookup of the pull request or its checks. The next run tries again. |
 | `not merged: ...` | Check that the App has access to the repository, that squash merging is allowed, and see [Merge queue](#merge-queue). A failed lookup of the required checks also gives this message. The next run tries again. |
 | `Skipped an invalid candidate: ...` | This is an error in the workflow. Tell Team eSyfo. |

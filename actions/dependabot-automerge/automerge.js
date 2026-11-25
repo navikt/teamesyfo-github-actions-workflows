@@ -21,11 +21,15 @@ const OSLO_DATE = new Intl.DateTimeFormat('en-CA', {
 const METADATA_START = '\n---\nupdated-dependencies:\n'
 const METADATA_END = /\n\.\.\.(\n|$)/
 const METADATA_FIELDS = { 'dependency-name': 'name', 'dependency-version': 'version', 'update-type': 'updateType' }
+const YAML_NULL = /^(null|Null|NULL|~)?$/
 
-function unquote(value) {
+// Returns null for an empty or YAML null value, so a required field without
+// content counts as missing.
+function scalarValue(value) {
   const trimmed = value.trim()
   const quoted = /^(["'])(.*)\1$/.exec(trimmed)
-  return quoted ? quoted[2] : trimmed
+  if (quoted) return quoted[2].trim() === '' ? null : quoted[2]
+  return YAML_NULL.test(trimmed) ? null : trimmed
 }
 
 // Reads the YAML block that Dependabot appends to its commit message. Only the
@@ -53,7 +57,7 @@ function parseUpdatedDependencies(message) {
     if (!keys || keys.has(key)) return null
     keys.add(key)
     const field = METADATA_FIELDS[key]
-    if (field) dependencies[dependencies.length - 1][field] = unquote(value)
+    if (field) dependencies[dependencies.length - 1][field] = scalarValue(value)
   }
   if (dependencies.length === 0 || dependencies.some((dependency) => !dependency.name || !dependency.version)) {
     return null
@@ -234,7 +238,7 @@ async function evaluatePullRequest({ api, core, log, pull, windowOpen, copilotRe
   const dependencies = headCommit ? parseUpdatedDependencies(headCommit.commit.message) : null
   const manualReview = async (reason) => {
     log(`needs a manual review, because ${reason}`)
-    if (copilotReview) await requestCopilotReview({ api, core, log, reviews, headSha, dependencies })
+    if (copilotReview) await requestCopilotReview({ api, core, log, headSha, dependencies })
     return null
   }
 
@@ -324,12 +328,15 @@ async function readRequiredChecks({ api }) {
 // Requests at most one Copilot review per set of dependency versions, so a
 // Dependabot rebase does not start a new review. When it cannot read a commit
 // that Copilot reviewed, it requests nothing and tries again on the next run.
-async function requestCopilotReview({ api, core, log, reviews, headSha, dependencies }) {
+// It reads the reviews after the pending requests, so a review that Copilot
+// submits between the two reads is still seen.
+async function requestCopilotReview({ api, core, log, headSha, dependencies }) {
   const { github, owner, repo, pull_number } = api
   try {
     const { data: requested } = await github.rest.pulls.listRequestedReviewers({ owner, repo, pull_number })
     if (requested.users.some((user) => COPILOT_LOGINS.has(user.login))) return
 
+    const reviews = await github.paginate(github.rest.pulls.listReviews, { owner, repo, pull_number, per_page: 100 })
     const reviewedCommits = new Set(
       reviews.filter((review) => COPILOT_LOGINS.has(review.user?.login)).map((review) => review.commit_id),
     )
