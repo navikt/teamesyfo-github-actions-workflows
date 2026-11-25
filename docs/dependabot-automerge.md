@@ -154,9 +154,8 @@ To give Copilot the same review rules as other Team eSyfo repositories, copy [`d
 ## Migrate from v1
 
 1. Do steps 2–7 in the [quick start](#quick-start): create and test the environment, add the environment secret, turn off **Allow GitHub Actions to create and approve pull requests**, and add a required status check.
-2. Delete the Dependabot secret `AUTOMERGE_APP_PRIVATE_KEY`, and any repository secret that contains the App key. Do this before the next step, because the v2 caller would otherwise pass a repository secret to the workflow if the environment secret is missing.
-3. Replace the caller workflow with the [v2 caller](#caller-workflow). Remove the `pull_request` trigger.
-4. On open Dependabot pull requests, turn off the auto-merge that v1 enabled, and dismiss the approvals from `github-actions[bot]`. v2 dismisses only approvals from the App, so an old approval from v1 still counts as the required review, also for a later commit. Run this from a clone of the repository, as a user who can dismiss reviews:
+2. Delete the Dependabot secret `AUTOMERGE_APP_PRIVATE_KEY`, and any repository secret that contains the App key. Do this before you add the v2 caller, because the caller would otherwise pass a repository secret to the workflow if the environment secret is missing. Without the secret, v1 stops before it approves anything.
+3. On open Dependabot pull requests, turn off the auto-merge that v1 enabled, and dismiss the approvals from `github-actions[bot]`. Do this before you add the v2 caller. v2 dismisses only approvals from the App, so an old approval from v1 still counts as the required review, also for a later commit. Run this from a clone of the repository, as a user who can dismiss reviews:
 
    ```bash
    for number in $(gh pr list --author app/dependabot --state open --limit 200 --json number --jq '.[].number'); do
@@ -171,6 +170,7 @@ To give Copilot the same review rules as other Team eSyfo repositories, copy [`d
    done
    ```
 
+4. Replace the caller workflow with the [v2 caller](#caller-workflow). Remove the `pull_request` trigger.
 5. Start the workflow manually on the default branch once, and read the job log.
 
 When all consumer repositories use v2, the team creates a new private key for the App, stores it only in the environments, and revokes the old key. Then `dependabot-automerge.yaml` (v1) can be deleted.
