@@ -13,6 +13,7 @@ const {
 } = require('./automerge')
 
 const HEAD = 'a'.repeat(40)
+const MAIN_SHA = '9'.repeat(40)
 
 function dependabotMessage(...entries) {
   const yaml = entries
@@ -89,18 +90,29 @@ describe('parseUpdatedDependencies', () => {
 })
 
 describe('decidePolicy', () => {
+  const workflow = { filename: '.github/workflows/build.yaml', status: 'modified' }
+  const action = { filename: 'actions/setup/action.yml', status: 'modified' }
+  const packageJson = { filename: 'package.json', status: 'modified' }
+  const major = [{ updateType: MAJOR }]
   const cases = [
-    ['github_actions major', 'github_actions', [{ updateType: MAJOR }], true],
-    ['github_actions without metadata', 'github_actions', null, true],
-    ['npm patch and minor', 'npm_and_yarn', [{ updateType: PATCH }, { updateType: MINOR }], true],
-    ['gradle group with one major', 'gradle', [{ updateType: PATCH }, { updateType: MAJOR }], false],
-    ['npm without update type', 'npm_and_yarn', [{ updateType: undefined }], false],
-    ['npm without metadata', 'npm_and_yarn', null, false],
-    ['npm with an empty list', 'npm_and_yarn', [], false],
+    ['github_actions major in workflow and action files', 'github_actions', major, [workflow, action], true],
+    ['github_actions without metadata in a workflow file', 'github_actions', null, [workflow], true],
+    ['github_actions major that also changes package.json', 'github_actions', major, [workflow, packageJson], false],
+    ['github_actions major that adds a workflow', 'github_actions', major, [{ ...workflow, status: 'added' }], false],
+    ['github_actions major in a subdirectory of .github/workflows', 'github_actions', major, [{ ...workflow, filename: '.github/workflows/x/build.yaml' }], false],
+    ['github_actions major without changed files', 'github_actions', major, [], false],
+    ['github_actions minor that changes package.json', 'github_actions', [{ updateType: MINOR }], [packageJson], true],
+    ['npm patch and minor', 'npm_and_yarn', [{ updateType: PATCH }, { updateType: MINOR }], [packageJson], true],
+    ['npm major in a workflow file', 'npm_and_yarn', major, [workflow], false],
+    ['gradle group with one major', 'gradle', [{ updateType: PATCH }, { updateType: MAJOR }], [], false],
+    ['npm without update type', 'npm_and_yarn', [{ updateType: undefined }], [], false],
+    ['npm without metadata', 'npm_and_yarn', null, [], false],
+    ['npm with an empty list', 'npm_and_yarn', [], [], false],
   ]
-  for (const [name, ecosystem, dependencies, expected] of cases) {
-    it(`${name} -> automerge ${expected}`, () => {
-      assert.equal(decidePolicy({ ecosystem, dependencies }).automerge, expected)
+  for (const [name, ecosystem, dependencies, files, expected] of cases) {
+    it(`${name} -> automerge ${expected}`, async () => {
+      const policy = await decidePolicy({ ecosystem, dependencies, readFiles: async () => files })
+      assert.equal(policy.automerge, expected)
     })
   }
 })
@@ -129,6 +141,15 @@ describe('checkProvenance', () => {
 
 describe('summarizeChecks', () => {
   const run = (status, conclusion) => ({ name: 'ci', status, conclusion })
+  const workflowRun = (runNumber, conclusion, { event = 'pull_request', branch = 'dependabot/npm/a' } = {}) => ({
+    name: 'ci',
+    workflow_id: 7,
+    run_number: runNumber,
+    event,
+    head_branch: branch,
+    status: 'completed',
+    conclusion,
+  })
   const noStatus = { state: 'pending', total_count: 0 }
   const cases = [
     ['all checks green', [run('completed', 'success'), run('completed', 'skipped')], noStatus, [], 'success'],
@@ -143,6 +164,48 @@ describe('summarizeChecks', () => {
       [run('completed', 'success')],
       noStatus,
       [{ name: 'ci', status: 'completed', conclusion: 'startup_failure' }],
+      'blocked',
+    ],
+    [
+      'a cancelled workflow run that a newer run of the same workflow, event and branch replaced',
+      [run('completed', 'success')],
+      noStatus,
+      [workflowRun(2, 'success'), workflowRun(1, 'cancelled')],
+      'success',
+    ],
+    [
+      'a newer failed workflow run after a successful one',
+      [run('completed', 'success')],
+      noStatus,
+      [workflowRun(1, 'success'), workflowRun(2, 'failure')],
+      'blocked',
+    ],
+    [
+      'a workflow run that failed to start before a newer successful run',
+      [run('completed', 'success')],
+      noStatus,
+      [workflowRun(1, 'startup_failure'), workflowRun(2, 'success')],
+      'blocked',
+    ],
+    [
+      'a cancelled workflow run after an older successful run',
+      [run('completed', 'success')],
+      noStatus,
+      [workflowRun(1, 'success'), workflowRun(2, 'cancelled')],
+      'blocked',
+    ],
+    [
+      'a cancelled workflow run and a newer run for another event',
+      [run('completed', 'success')],
+      noStatus,
+      [workflowRun(2, 'success', { event: 'push' }), workflowRun(1, 'cancelled')],
+      'blocked',
+    ],
+    [
+      'a cancelled workflow run and a newer run on another branch',
+      [run('completed', 'success')],
+      noStatus,
+      [workflowRun(2, 'success', { branch: 'main' }), workflowRun(1, 'cancelled')],
       'blocked',
     ],
   ]
@@ -235,6 +298,11 @@ function dependabotPr(overrides = {}) {
     ],
     reviews: [],
     requestedReviewers: [],
+    // The files that the head commit changes, whether GitHub has more of them
+    // on another page, and whether reading them fails.
+    files: [{ filename: 'package.json', status: 'modified' }],
+    moreFiles: false,
+    filesUnavailable: false,
     checkRuns: [{ name: 'build', status: 'completed', conclusion: 'success' }],
     combinedStatus: { state: 'pending', total_count: 0 },
     workflowRuns: [],
@@ -242,16 +310,26 @@ function dependabotPr(overrides = {}) {
       { __typename: 'CheckRun', name: 'build', status: 'COMPLETED', conclusion: 'SUCCESS', isRequired: true },
     ],
     isInMergeQueue: false,
+    queueEvents: [],
+    moreQueueEvents: false,
     ...overrides,
   }
 }
+
+const added = { __typename: 'AddedToMergeQueueEvent' }
+const removed = { __typename: 'RemovedFromMergeQueueEvent' }
+const forcePush = (before, after) => ({
+  __typename: 'HeadRefForcePushedEvent',
+  beforeCommit: before && { oid: before },
+  afterCommit: after && { oid: after },
+})
 
 // A small in-memory GitHub that records every write and who made it. Each
 // client acts as one identity, so tests can tell GITHUB_TOKEN from the App.
 function fakeGitHub({
   pulls,
   mergeQueue = false,
-  oldCommits = {},
+  oldHistories: histories = {},
   onApprove,
   onListRequestedReviewers,
   failMergeQueueLookup = false,
@@ -263,6 +341,7 @@ function fakeGitHub({
   const noChecks = { checkRuns: [], combinedStatus: { state: 'pending', total_count: 0 }, workflowRuns: [] }
   const byHead = (sha) => pulls.find((p) => p.head.sha === sha) ?? noChecks
   const writes = { approvals: [], dismissals: [], reviewRequests: [], merges: [], enqueues: [] }
+  const reads = { compareBases: [] }
   let reviewId = 100
 
   const client = (login) => ({
@@ -276,10 +355,18 @@ function fakeGitHub({
         return { enqueuePullRequest: { mergeQueueEntry: { position: 1 } } }
       }
       const p = pr(variables.number)
+      const timelineItems = {
+        pageInfo: { hasPreviousPage: p.moreQueueEvents },
+        nodes: p.queueEvents.slice(-100),
+      }
       if (query.includes('statusCheckRollup')) {
         const contexts = { pageInfo: { hasNextPage: false }, nodes: p.rollupContexts }
         const commit = { oid: p.head.sha, statusCheckRollup: { contexts } }
-        return { repository: { pullRequest: { commits: { nodes: [{ commit }] } } } }
+        return {
+          repository: {
+            pullRequest: { isInMergeQueue: p.isInMergeQueue, timelineItems, commits: { nodes: [{ commit }] } },
+          },
+        }
       }
       if (failMergeQueueLookup) throw new Error('GraphQL is unavailable')
       return {
@@ -292,6 +379,7 @@ function fakeGitHub({
             baseRefName: p.base.ref,
             isInMergeQueue: p.isInMergeQueue,
             isMergeQueueEnabled: mergeQueue,
+            timelineItems,
           },
           defaultBranchRef: { name: 'main' },
         },
@@ -299,11 +387,28 @@ function fakeGitHub({
     },
     rest: {
       repos: {
-        get: async () => ({ data: { default_branch: 'main', full_name: 'navikt/app' } }),
         getCombinedStatusForRef: async ({ ref }) => ({ data: byHead(ref).combinedStatus }),
         getCommit: async ({ ref }) => {
-          if (!oldCommits[ref]) throw Object.assign(new Error('Not Found'), { status: 404 })
-          return { data: { sha: ref, commit: { message: oldCommits[ref] } } }
+          const pull = pulls.find((p) => p.head.sha === ref)
+          if (!pull) throw Object.assign(new Error('Not Found'), { status: 404 })
+          if (pull.filesUnavailable) throw Object.assign(new Error('Server Error'), { status: 502 })
+          const headers = pull.moreFiles ? { link: '<https://api.github.com/commit?page=2>; rel="next"' } : {}
+          return { data: { sha: ref, files: pull.files }, headers }
+        },
+        // histories holds the commits that GitHub lists between the default
+        // branch and a commit, or the error that GitHub returns. Without an
+        // entry, a commit in a PR has the linear history of the PR's commits
+        // up to and including it. The default branch is at MAIN_SHA.
+        compareCommitsWithBasehead: async ({ basehead }) => {
+          const [base, ref] = basehead.split('...')
+          reads.compareBases.push(base)
+          const prefix = (pull) => pull.commits.slice(0, pull.commits.findIndex((commit) => commit.sha === ref) + 1)
+          const pull = pulls.find((p) => p.commits.some((commit) => commit.sha === ref))
+          const commits = histories[ref] ?? (pull && prefix(pull))
+          if (commits instanceof Error) throw commits
+          if (!['main', MAIN_SHA].includes(base) || !commits) throw Object.assign(new Error('Not Found'), { status: 404 })
+          const data = { base_commit: { sha: MAIN_SHA }, total_commits: commits.total ?? commits.length, commits: [...commits] }
+          return { data }
         },
       },
       checks: {
@@ -315,7 +420,13 @@ function fakeGitHub({
         listWorkflowRunsForRepo: async ({ head_sha }) => ({ data: { workflow_runs: byHead(head_sha).workflowRuns } }),
       },
       pulls: {
-        list: async () => ({ data: pulls.filter((p) => p.state === 'open') }),
+        // listedAs holds fields that were out of date when the PR was listed.
+        list: async ({ base }) => ({
+          data: pulls
+            .filter((p) => p.state === 'open')
+            .map((p) => (p.listedAs ? { ...p, ...p.listedAs } : p))
+            .filter((p) => !base || p.base.ref === base),
+        }),
         get: async ({ pull_number }) => ({ data: pr(pull_number) }),
         listCommits: async ({ pull_number }) => ({ data: pr(pull_number).commits }),
         listReviews: async ({ pull_number }) => ({ data: [...pr(pull_number).reviews] }),
@@ -353,7 +464,7 @@ function fakeGitHub({
     },
   })
 
-  return { writes, actions: client(ACTIONS), app: client(APP) }
+  return { writes, reads, actions: client(ACTIONS), app: client(APP) }
 }
 
 function fakeCore() {
@@ -373,7 +484,7 @@ async function find(pulls, { now = TUESDAY, context = scheduled, copilotReview =
   const fake = fakeGitHub({ pulls, ...options })
   const core = fakeCore()
   await findMergeCandidates({ github: fake.actions, context, core, now, copilotReview })
-  return { writes: fake.writes, core, candidates: JSON.parse(core.outputs.candidates) }
+  return { writes: fake.writes, reads: fake.reads, core, candidates: JSON.parse(core.outputs.candidates) }
 }
 
 describe('findMergeCandidates', () => {
@@ -383,9 +494,38 @@ describe('findMergeCandidates', () => {
     assert.deepEqual(writes.approvals, [])
   })
 
-  it('selects a major GitHub Actions update', async () => {
-    const head = { ...dependabotPr().head, ref: 'dependabot/github_actions/actions/checkout-6.0.0' }
-    const { candidates } = await find([dependabotPr({ updateType: MAJOR, head })])
+  const actionsUpdate = (files) =>
+    dependabotPr({
+      updateType: MAJOR,
+      head: { ...dependabotPr().head, ref: 'dependabot/github_actions/actions/checkout-6.0.0' },
+      files,
+    })
+
+  it('selects a major GitHub Actions update that changes only workflow and action files', async () => {
+    const files = [
+      { filename: '.github/workflows/build.yaml', status: 'modified' },
+      { filename: 'actions/setup/action.yaml', status: 'modified' },
+    ]
+    const { candidates } = await find([actionsUpdate(files)])
+    assert.deepEqual(candidates, [{ number: 1, headSha: HEAD }])
+  })
+
+  it('requests a manual review of a major update on a GitHub Actions branch that changes other files', async () => {
+    const { writes, candidates } = await find([actionsUpdate([{ filename: 'package.json', status: 'modified' }])])
+    assert.deepEqual(candidates, [])
+    assert.equal(writes.reviewRequests.length, 1)
+  })
+
+  it('requests a manual review of a major GitHub Actions update when GitHub lists its files on several pages', async () => {
+    const pull = actionsUpdate([{ filename: '.github/workflows/build.yaml', status: 'modified' }])
+    const { writes, candidates } = await find([{ ...pull, moreFiles: true }])
+    assert.deepEqual(candidates, [])
+    assert.equal(writes.reviewRequests.length, 1)
+  })
+
+  it('selects a patch update on a GitHub Actions branch without reading its files', async () => {
+    const head = { ...dependabotPr().head, ref: 'dependabot/github_actions/actions/checkout-5.0.1' }
+    const { candidates } = await find([dependabotPr({ head, filesUnavailable: true })])
     assert.deepEqual(candidates, [{ number: 1, headSha: HEAD }])
   })
 
@@ -398,6 +538,7 @@ describe('findMergeCandidates', () => {
     ['a PR opened by someone else', { user: { login: 'someone' } }],
     ['a merge conflict', { mergeable: false }],
     ['a PR whose mergeability GitHub has not computed', { mergeable: null }],
+    ['a PR that is already in the merge queue', { isInMergeQueue: true }],
     ['a failed check', { checkRuns: [{ name: 'build', status: 'completed', conclusion: 'failure' }] }],
     ['a PR without a required check', { rollupContexts: [{ ...dependabotPr().rollupContexts[0], isRequired: false }] }],
     ['a requested change', { reviews: [{ id: 1, user: { login: 'someone' }, state: 'CHANGES_REQUESTED', commit_id: HEAD }] }],
@@ -418,6 +559,75 @@ describe('findMergeCandidates', () => {
     const context = { ...scheduled, eventName: 'workflow_dispatch' }
     const { candidates } = await find([dependabotPr()], { now: SATURDAY, context })
     assert.deepEqual(candidates, [{ number: 1, headSha: HEAD }])
+  })
+
+  const other = 'c'.repeat(40)
+  const moved = 'd'.repeat(40)
+  const wasRemoved = 'removed from the merge queue'
+  const unknown = 'does not tell which commit was added'
+  const queueHistories = [
+    ['left the merge queue at its head', [forcePush(other, HEAD), added, removed], wasRemoved],
+    ['entered the merge queue before any force push', [added, removed], wasRemoved],
+    ['left the merge queue without an addition in the timeline', [removed], wasRemoved],
+    ['brought a removed head back by force push', [added, removed, forcePush(HEAD, other), forcePush(other, HEAD)], wasRemoved],
+    ['was still in the merge queue when its head was force-pushed', [forcePush(other, moved), added, forcePush(moved, HEAD)], wasRemoved],
+    ['entered the merge queue at a head GitHub does not name', [added, removed, forcePush(null, HEAD)], unknown],
+    ['entered the merge queue after a force push to a head GitHub does not name', [forcePush(other, null), added, removed, forcePush(moved, HEAD)], unknown],
+    [
+      'moved its head without force after it entered the merge queue',
+      [forcePush(other, moved), added, removed, forcePush(HEAD, other), forcePush(other, HEAD)],
+      unknown,
+    ],
+    ['moved its head without force after it last entered the merge queue', [forcePush(other, moved), added, removed], unknown],
+    ['has a new head after it left the merge queue', [added, removed, forcePush(other, HEAD)], null],
+    ['has a new head after an old head entered the merge queue twice', [forcePush(other, moved), added, removed, added, removed, forcePush(moved, HEAD)], null],
+  ]
+  for (const [name, queueEvents, reason] of queueHistories) {
+    const outcome = reason ? `does not select it because it was ${reason === unknown ? 'unknown' : 'removed'}` : 'selects it'
+    it(`${outcome} when a PR ${name}`, async () => {
+      const { core, candidates } = await find([dependabotPr({ queueEvents })])
+      if (!reason) return assert.deepEqual(candidates, [{ number: 1, headSha: HEAD }])
+      assert.deepEqual(candidates, [])
+      assert.ok(core.logs.some((log) => log.includes(reason)), core.logs.join('\n'))
+    })
+  }
+
+  it('does not select a PR with more merge queue events than one page', async () => {
+    const { core, candidates } = await find([dependabotPr({ queueEvents: [forcePush(other, HEAD)], moreQueueEvents: true })])
+    assert.deepEqual(candidates, [])
+    assert.ok(core.logs.some((log) => log.includes('more than 100 merge queue')))
+  })
+
+  it('skips without a review request a PR that was listed on the default branch but now targets another', async () => {
+    const approval = { id: 5, user: { login: APP }, state: 'APPROVED', commit_id: HEAD }
+    const release = { ref: 'release', repo: { full_name: 'navikt/app', default_branch: 'main' } }
+    const main = dependabotPr().base
+    const pull = dependabotPr({ updateType: MAJOR, base: release, reviews: [approval], listedAs: { base: main } })
+    const { writes, candidates } = await find([pull])
+    assert.deepEqual(candidates, [])
+    assert.deepEqual(writes.dismissals, [{ by: ACTIONS, number: 1, review_id: 5 }])
+    assert.deepEqual(writes.reviewRequests, [])
+  })
+
+  it('dismisses every App approval on a PR that no longer targets the default branch, and skips it', async () => {
+    const approval = (id) => ({ id, user: { login: APP }, state: 'APPROVED', commit_id: HEAD })
+    const human = { id: 6, user: { login: 'someone' }, state: 'APPROVED', commit_id: HEAD }
+    const base = { ref: 'release', repo: { full_name: 'navikt/app', default_branch: 'main' } }
+    const reviews = [approval(5), human, approval(8)]
+    const { writes, candidates } = await find([dependabotPr({ updateType: MAJOR, base, reviews })])
+    assert.deepEqual(candidates, [])
+    assert.deepEqual(writes.dismissals, [
+      { by: ACTIONS, number: 1, review_id: 5 },
+      { by: ACTIONS, number: 1, review_id: 8 },
+    ])
+    assert.deepEqual(writes.reviewRequests, [])
+  })
+
+  it('keeps an App approval when the PR targets the default branch again after it was listed', async () => {
+    const approval = { id: 5, user: { login: APP }, state: 'APPROVED', commit_id: HEAD }
+    const release = { ref: 'release', repo: { full_name: 'navikt/app', default_branch: 'main' } }
+    const { writes } = await find([dependabotPr({ reviews: [approval], listedAs: { base: release } })])
+    assert.deepEqual(writes.dismissals, [])
   })
 
   const staleApproval = { id: 7, user: { login: APP }, state: 'APPROVED', commit_id: 'e'.repeat(40) }
@@ -453,22 +663,141 @@ describe('findMergeCandidates', () => {
 
   const copilotReview = (commitId) => ({ id: 3, user: { login: COPILOT }, state: 'COMMENTED', commit_id: commitId })
   const older = 'f'.repeat(40)
+  const fixSha = 'e'.repeat(40)
+  const majorCommit = (sha, version) => ({
+    ...dependabotPr().commits[0],
+    sha,
+    commit: {
+      message: dependabotMessage({ name: 'left-pad', version, updateType: MAJOR }),
+      verification: { verified: true },
+    },
+  })
+  const maintainerFix = (sha) => ({
+    sha,
+    author: { login: 'someone' },
+    committer: { login: 'someone' },
+    commit: { message: 'fix: adapt to the new version', verification: { verified: false } },
+  })
+  const head = dependabotPr({ updateType: MAJOR }).commits[0]
+  const mergeSha = '7'.repeat(40)
+  const withoutMetadata = { ...head, commit: { ...head.commit, message: 'Bump left-pad from 1.0.0 to 2.0.0' } }
   const reviewedEarlier = [
-    ['the head commit', [copilotReview(HEAD)], '1.0.1', 0],
-    ['the same versions on an older commit', [copilotReview(older)], '1.0.1', 0],
-    ['other versions on an older commit', [copilotReview(older)], '1.0.0', 1],
-    ['the head commit before another commit', [copilotReview(HEAD), copilotReview(older)], '1.0.0', 0],
-    ['an older commit it cannot read', [copilotReview(older)], null, 0],
+    ['the head commit', { reviews: [copilotReview(HEAD)] }, {}, 0],
+    ['the same versions on a commit that left the PR', { reviews: [copilotReview(older)] }, { [older]: [majorCommit(older, '1.0.1')] }, 0],
+    ['other versions on a commit that left the PR', { reviews: [copilotReview(older)] }, { [older]: [majorCommit(older, '1.0.0')] }, 1],
+    ['the head commit before another commit', { reviews: [copilotReview(HEAD), copilotReview(older)] }, { [older]: [majorCommit(older, '1.0.0')] }, 0],
+    [
+      'a maintainer fix of the same versions that left the PR',
+      { reviews: [copilotReview(fixSha)] },
+      { [fixSha]: [majorCommit(older, '1.0.1'), maintainerFix(fixSha)] },
+      0,
+    ],
+    [
+      'a maintainer fix of other versions that left the PR',
+      { reviews: [copilotReview(fixSha)] },
+      { [fixSha]: [majorCommit(older, '1.0.0'), maintainerFix(fixSha)] },
+      1,
+    ],
+    [
+      'other versions on a commit that is still in the PR',
+      { reviews: [copilotReview(older)], commits: [majorCommit(older, '1.0.0'), head] },
+      {},
+      1,
+    ],
+    [
+      'a commit with more history than GitHub lists',
+      { reviews: [copilotReview(older)] },
+      { [older]: Object.assign([majorCommit(older, '1.0.1')], { total: 300 }) },
+      1,
+    ],
+    [
+      'the same versions on a head with more history than GitHub lists',
+      { reviews: [copilotReview(older)] },
+      { [older]: [majorCommit(older, '1.0.1')], [HEAD]: Object.assign([head], { total: 300 }) },
+      1,
+    ],
+    [
+      'a maintainer fix beside a newer Dependabot commit',
+      {
+        reviews: [copilotReview(fixSha)],
+        commits: [majorCommit(older, '1.0.0'), head, maintainerFix(fixSha), maintainerFix(mergeSha)],
+      },
+      { [fixSha]: [majorCommit(older, '1.0.0'), maintainerFix(fixSha)] },
+      1,
+    ],
+    [
+      'the newer of two Dependabot commits that a maintainer has merged',
+      { reviews: [copilotReview(HEAD)], commits: [majorCommit(older, '1.0.0'), head, maintainerFix(mergeSha)] },
+      { [HEAD]: [head] },
+      1,
+    ],
+    ['a commit that no longer exists', { reviews: [copilotReview(older)] }, {}, 1],
+    [
+      'a commit that no longer exists and a commit with the same versions',
+      { reviews: [copilotReview(older), copilotReview(fixSha)] },
+      { [fixSha]: [majorCommit(fixSha, '1.0.1')] },
+      0,
+    ],
+    [
+      'a Dependabot commit without metadata that a maintainer has fixed',
+      { reviews: [copilotReview(HEAD)], commits: [withoutMetadata, maintainerFix(fixSha)] },
+      {},
+      0,
+    ],
+    [
+      'a rebased Dependabot commit without metadata',
+      { reviews: [copilotReview(older)], commits: [withoutMetadata] },
+      { [older]: [{ ...withoutMetadata, sha: older }] },
+      1,
+    ],
   ]
-  for (const [name, reviews, olderVersion, expectedRequests] of reviewedEarlier) {
+  for (const [name, overrides, oldHistories, expectedRequests] of reviewedEarlier) {
     it(`after a Copilot review of ${name}, requests ${expectedRequests} new review`, async () => {
-      const oldCommits = olderVersion
-        ? { [older]: dependabotMessage({ name: 'left-pad', version: olderVersion, updateType: MAJOR }) }
-        : {}
-      const { writes } = await find([dependabotPr({ updateType: MAJOR, reviews })], { oldCommits })
+      const pull = dependabotPr({ updateType: MAJOR, ...overrides })
+      pull.head = { ...pull.head, sha: pull.commits.at(-1).sha }
+      const { writes, core } = await find([pull], { oldHistories })
+      assert.deepEqual(core.warnings, [])
       assert.equal(writes.reviewRequests.length, expectedRequests)
     })
   }
+
+  it('requests nothing and warns when GitHub fails to compare a commit that Copilot reviewed', async () => {
+    const oldHistories = { [older]: Object.assign(new Error('Server Error'), { status: 502 }) }
+    const { writes, core } = await find([dependabotPr({ updateType: MAJOR, reviews: [copilotReview(older)] })], { oldHistories })
+    assert.deepEqual(writes.reviewRequests, [])
+    assert.match(core.warnings.join('\n'), /could not compare commit f{40} with 9{40}: Server Error/)
+  })
+
+  it('compares the reviewed commits with the commit that the default branch was at for the head', async () => {
+    const oldHistories = { [older]: [majorCommit(older, '1.0.1')] }
+    const { reads } = await find([dependabotPr({ updateType: MAJOR, reviews: [copilotReview(older)] })], { oldHistories })
+    assert.deepEqual(reads.compareBases, ['main', MAIN_SHA])
+  })
+
+  const withMaintainerFix = (reviews) => {
+    const pull = dependabotPr({ updateType: MAJOR, reviews })
+    const fix = maintainerFix('b'.repeat(40))
+    return Object.assign(pull, { head: { ...pull.head, sha: fix.sha }, commits: [...pull.commits, fix] })
+  }
+
+  it('does not request Copilot again when a maintainer pushes a fix after its review', async () => {
+    const { writes } = await find([withMaintainerFix([copilotReview(HEAD)])])
+    assert.deepEqual(writes.reviewRequests, [])
+  })
+
+  it('does not request Copilot again for the same versions after a rebase and a maintainer fix', async () => {
+    const oldHistories = { [older]: [majorCommit(older, '1.0.1')] }
+    const { writes } = await find([withMaintainerFix([copilotReview(older)])], { oldHistories })
+    assert.deepEqual(writes.reviewRequests, [])
+  })
+
+  it('requests Copilot for a GitHub Actions update that someone else has pushed to, without reading its files', async () => {
+    const pull = withMaintainerFix([])
+    Object.assign(pull, { head: { ...pull.head, ref: 'dependabot/github_actions/actions/checkout-5' }, filesUnavailable: true })
+    const { writes, core } = await find([pull])
+    assert.deepEqual(core.warnings, [])
+    assert.equal(writes.reviewRequests.length, 1)
+  })
 
   it('does not request Copilot again when it submits its pending review just before the requests are read', async () => {
     const submitPendingCopilotReview = (pull) => {
@@ -534,6 +863,7 @@ describe('approveAndMerge', () => {
     ],
     ['a check failed', { checkRuns: [{ name: 'build', status: 'completed', conclusion: 'failure' }] }, 'concluded failure'],
     ['a reviewer requested changes', { reviews: [{ id: 1, user: { login: 'someone' }, state: 'CHANGES_REQUESTED' }] }, 'requested changes'],
+    ['the PR left the merge queue', { queueEvents: [added, removed] }, 'removed from the merge queue'],
   ]
   for (const [name, overrides, reason] of changedSinceFind) {
     it(`neither approves nor merges when ${name} after the PR was selected`, async () => {
@@ -546,24 +876,30 @@ describe('approveAndMerge', () => {
   }
 
   const mergeFailures = [
-    ['GitHub rejects the merge', { failMerge: true }],
-    ['the head moves during the approval', { onApprove: (pr) => (pr.head = { ...pr.head, sha: 'd'.repeat(40) }) }],
-    ['it cannot tell whether the branch has a merge queue', { failMergeQueueLookup: true }],
+    ['GitHub rejects the merge', { failMerge: true }, 'Required status check'],
+    ['the head moves during the approval', { onApprove: (pr) => (pr.head = { ...pr.head, sha: 'd'.repeat(40) }) }, 'the head changed after approval'],
+    ['it cannot tell whether the branch has a merge queue', { failMergeQueueLookup: true }, 'GraphQL is unavailable'],
+    [
+      'the PR enters and leaves the merge queue during the approval',
+      { mergeQueue: true, onApprove: (pr) => pr.queueEvents.push(added, removed) },
+      'removed from the merge queue',
+    ],
   ]
-  for (const [name, options] of mergeFailures) {
+  for (const [name, options, reason] of mergeFailures) {
     it(`dismisses its new approval when ${name}`, async () => {
       const { writes, core } = await run([dependabotPr()], candidate, options)
       assert.deepEqual(writes.merges, [])
       assert.deepEqual(writes.enqueues, [])
       assert.deepEqual(writes.dismissals, [{ by: ACTIONS, number: 1, review_id: 100 }])
       assert.equal(core.warnings.length, 1)
+      assert.match(core.warnings[0], new RegExp(`not merged: .*${reason}`))
     })
   }
 
-  it('does not add a PR to the merge queue twice', async () => {
-    const approval = { id: 5, user: { login: APP }, state: 'APPROVED', commit_id: HEAD }
-    const pulls = [dependabotPr({ reviews: [approval], isInMergeQueue: true })]
-    const { writes } = await run(pulls, candidate, { mergeQueue: true })
+  it('keeps its approval and does not enqueue again when the PR enters the merge queue during the run', async () => {
+    const onApprove = (pr) => (pr.isInMergeQueue = true)
+    const { writes } = await run([dependabotPr()], candidate, { mergeQueue: true, onApprove })
+    assert.equal(writes.approvals.length, 1)
     assert.deepEqual(writes.enqueues, [])
     assert.deepEqual(writes.dismissals, [])
   })

@@ -70,10 +70,31 @@ function ecosystemFromBranch(ref) {
   return match ? match[1] : null
 }
 
-function decidePolicy({ ecosystem, dependencies }) {
-  if (ecosystem === 'github_actions') {
-    return { automerge: true, reason: 'GitHub Actions updates are always automerged' }
-  }
+// Repositories can change the branch template, so the branch name alone does
+// not prove an Actions update. The exception also requires that the head
+// commit only changes existing workflow and action files.
+const WORKFLOW_FILE = /^\.github\/workflows\/[^/]+\.ya?ml$/
+const ACTION_FILE = /(^|\/)action\.ya?ml$/
+
+function changesOnlyActionsFiles(files) {
+  return (
+    files?.length > 0 &&
+    files.every(
+      (file) => file.status === 'modified' && (WORKFLOW_FILE.test(file.filename) || ACTION_FILE.test(file.filename)),
+    )
+  )
+}
+
+// The rule for every ecosystem: automerge patch and minor updates. A major
+// GitHub Actions update is an exception, and only then are the files read.
+async function decidePolicy({ ecosystem, dependencies, readFiles }) {
+  const byMetadata = metadataPolicy(dependencies)
+  if (byMetadata.automerge || ecosystem !== 'github_actions') return byMetadata
+  if (!changesOnlyActionsFiles(await readFiles())) return byMetadata
+  return { automerge: true, reason: 'GitHub Actions updates are always automerged' }
+}
+
+function metadataPolicy(dependencies) {
   if (!dependencies?.length) {
     return { automerge: false, reason: 'the commit has no Dependabot metadata' }
   }
@@ -87,6 +108,14 @@ function decidePolicy({ ecosystem, dependencies }) {
   return { automerge: true, reason: 'all updates are patch or minor' }
 }
 
+// Returns why a commit is not an untouched Dependabot commit, or null.
+function dependabotCommitProblem(commit) {
+  if (commit.author?.login !== DEPENDABOT_LOGIN) return 'the commit author is not Dependabot'
+  if (commit.committer?.login !== 'web-flow') return 'the committer is not GitHub'
+  if (commit.commit?.verification?.verified !== true) return 'the commit signature is not verified'
+  return null
+}
+
 // Only an untouched Dependabot commit may be automerged: one commit, written by
 // Dependabot, committed and signed by GitHub, and still the head of the PR.
 function checkProvenance({ headSha, commits }) {
@@ -95,13 +124,26 @@ function checkProvenance({ headSha, commits }) {
   }
   const [commit] = commits
   if (commit.sha !== headSha) return { ok: false, reason: 'the commit is not the PR head' }
-  if (commit.author?.login !== DEPENDABOT_LOGIN) return { ok: false, reason: 'the commit author is not Dependabot' }
-  if (commit.committer?.login !== 'web-flow') return { ok: false, reason: 'the committer is not GitHub' }
-  if (commit.commit?.verification?.verified !== true) return { ok: false, reason: 'the commit signature is not verified' }
+  const problem = dependabotCommitProblem(commit)
+  if (problem) return { ok: false, reason: problem }
   return { ok: true, reason: 'one verified Dependabot commit' }
 }
 
-function summarizeChecks({ checkRuns, combinedStatus, workflowRuns }) {
+// A workflow can run again for the same commit, for example when a PR is
+// reopened. A cancelled run then stops counting when the same workflow has a
+// newer run for the same event and branch, and the newer run's own result
+// counts. Any other failure still blocks; re-running it replaces its result.
+function withoutReplacedCancellations(workflowRuns) {
+  const sameContext = (a, b) => a.workflow_id === b.workflow_id && a.event === b.event && a.head_branch === b.head_branch
+  return workflowRuns.filter(
+    (run) =>
+      run.conclusion !== 'cancelled' ||
+      !workflowRuns.some((newer) => sameContext(newer, run) && newer.run_number > run.run_number),
+  )
+}
+
+function summarizeChecks({ checkRuns, combinedStatus, workflowRuns: allWorkflowRuns }) {
+  const workflowRuns = withoutReplacedCancellations(allWorkflowRuns)
   const failedRun = checkRuns.find((run) => run.status === 'completed' && FAILING_CONCLUSIONS.has(run.conclusion))
   if (failedRun) return { state: 'blocked', reason: `check "${failedRun.name}" concluded ${failedRun.conclusion}` }
   const failedWorkflow = workflowRuns.find(
@@ -199,17 +241,11 @@ function isDependabotPullRequest(pull) {
 // that is ready to merge, bound to the head commit that passed every gate.
 async function findMergeCandidates({ github, context, core, now = new Date(), copilotReview = true }) {
   const { owner, repo } = context.repo
-  const { data: repository } = await github.rest.repos.get({ owner, repo })
   const windowOpen = context.eventName !== 'schedule' || isMergeWindowOpen(now)
   if (!windowOpen) core.info('The merge window is closed. This run merges no pull requests.')
 
-  const pulls = await github.paginate(github.rest.pulls.list, {
-    owner,
-    repo,
-    state: 'open',
-    base: repository.default_branch,
-    per_page: 100,
-  })
+  // Lists PRs on every base, so it also finds App approvals on retargeted PRs.
+  const pulls = await github.paginate(github.rest.pulls.list, { owner, repo, state: 'open', per_page: 100 })
   const candidates = []
   for (const pull of pulls.filter(isDependabotPullRequest)) {
     const api = { github, owner, repo, pull_number: pull.number }
@@ -225,28 +261,35 @@ async function findMergeCandidates({ github, context, core, now = new Date(), co
   return candidates
 }
 
-async function evaluatePullRequest({ api, core, log, pull, windowOpen, copilotReview }) {
+async function evaluatePullRequest({ api, core, log, pull: listed, windowOpen, copilotReview }) {
   const { github, owner, repo, pull_number } = api
-  const headSha = pull.head.sha
   const reviews = await github.paginate(github.rest.pulls.listReviews, { owner, repo, pull_number, per_page: 100 })
-  if (!(await dismissStaleApprovals({ api, core, reviews, headSha }))) {
+  const approvals = reviews.filter(isAppApproval)
+  // The list can be older than the reviews, so a PR with App approvals is read
+  // again, and the rest of the evaluation uses that read.
+  const pull = approvals.length > 0 ? (await github.rest.pulls.get({ owner, repo, pull_number })).data : listed
+  if (!(await dismissStaleApprovals({ api, core, pull, approvals }))) {
     return skip(log, 'a stale approval could not be dismissed')
   }
+  if (!targetsDefaultBranch(pull)) return skip(log, `targets ${pull.base.ref}, not the default branch`)
 
+  const headSha = pull.head.sha
   const commits = await github.paginate(github.rest.pulls.listCommits, { owner, repo, pull_number, per_page: 100 })
   const headCommit = commits.find((commit) => commit.sha === headSha)
   const dependencies = headCommit ? parseUpdatedDependencies(headCommit.commit.message) : null
   const manualReview = async (reason) => {
     log(`needs a manual review, because ${reason}`)
-    if (copilotReview) await requestCopilotReview({ api, core, log, headSha, dependencies })
+    if (copilotReview) await requestCopilotReview({ api, core, log, pull })
     return null
   }
 
-  const policy = decidePolicy({ ecosystem: ecosystemFromBranch(pull.head.ref), dependencies })
-  if (!policy.automerge) return manualReview(policy.reason)
-  if (pull.draft) return skip(log, 'is a draft')
   const provenance = checkProvenance({ headSha, commits })
   if (!provenance.ok) return manualReview(provenance.reason)
+  const ecosystem = ecosystemFromBranch(pull.head.ref)
+  const readFiles = () => readHeadCommitFiles({ api, headSha })
+  const policy = await decidePolicy({ ecosystem, dependencies, readFiles })
+  if (!policy.automerge) return manualReview(policy.reason)
+  if (pull.draft) return skip(log, 'is a draft')
 
   const gates = await checkMergeGates({ api, headSha })
   if (!gates.ok) return skip(log, gates.reason)
@@ -260,6 +303,10 @@ function skip(log, reason) {
   return null
 }
 
+function targetsDefaultBranch(pull) {
+  return pull.base.ref === pull.base.repo.default_branch
+}
+
 // Reads fresh data every time, because a pull request can change between the
 // two steps.
 async function checkMergeGates({ api, headSha }) {
@@ -268,7 +315,7 @@ async function checkMergeGates({ api, headSha }) {
   const { data: pull } = await github.rest.pulls.get({ owner, repo, pull_number })
   if (pull.state !== 'open') return blocked('the PR is not open')
   if (pull.draft) return blocked('the PR is a draft')
-  if (pull.base.ref !== pull.base.repo.default_branch) return blocked('the PR does not target the default branch')
+  if (!targetsDefaultBranch(pull)) return blocked('the PR does not target the default branch')
   if (pull.head.sha !== headSha) return blocked('the head commit changed')
   if (pull.mergeable !== true) {
     return blocked(pull.mergeable === false ? 'has a merge conflict' : 'GitHub has not computed mergeability yet')
@@ -278,21 +325,78 @@ async function checkMergeGates({ api, headSha }) {
   if (hasChangesRequested(reviews)) return blocked('a reviewer has requested changes')
   const checks = summarizeChecks(await readChecks({ api, headSha }))
   if (checks.state !== 'success') return blocked(checks.reason)
-  const required = summarizeRequiredChecks({ headSha, commit: await readRequiredChecks({ api }) })
+  const state = await readQueueAndRequiredChecks({ api })
+  if (state.isInMergeQueue) return blocked('the PR is already in the merge queue')
+  const removal = queueRemovalProblem({ headSha, timelineItems: state.timelineItems })
+  if (removal) return blocked(removal)
+  const required = summarizeRequiredChecks({ headSha, commit: state.commits.nodes[0]?.commit })
   if (required.state !== 'success') return blocked(required.reason)
   return { ok: true, reason: `${checks.reason} and ${required.reason}`, reviews }
 }
 
+// GitHub removes a PR from the merge queue when the queue checks fail or a
+// maintainer removes it, while the checks on its head can stay green. A head
+// that has been in the queue must not return to it, but a new head may. The
+// timeline records when the PR was added to and removed from the queue, and
+// each force push with the heads before and after it. Dependabot changes the
+// head only by force-pushing, so the head at an addition is the head after the
+// force push before it. A head that is force-pushed while the PR is still in
+// the queue counts as added as well, and so does a head that the timeline shows
+// removed without an addition. A push without force leaves no event, so
+// when the heads around a segment with an addition differ, the added commit is
+// unknown. The timeline does not show the head before the first force push, so
+// the first segment is assumed to end with the head it started with.
+function queueRemovalProblem({ headSha, timelineItems }) {
+  if (timelineItems.pageInfo.hasPreviousPage) {
+    return 'the PR has more than 100 merge queue and force-push events; merge it by hand'
+  }
+  const firstPush = timelineItems.nodes.find((event) => event.__typename === 'HeadRefForcePushedEvent')
+  let head = firstPush ? firstPush.beforeCommit?.oid : headSha
+  let added = false
+  let queued = false
+  const endSegment = (endHead) => {
+    if (!added) return null
+    if (!head || endHead !== head) {
+      return 'GitHub does not tell which commit was added to the merge queue; merge the PR by hand'
+    }
+    if (head === headSha) {
+      return 'the head commit was removed from the merge queue; push a new commit, for example with "@dependabot rebase", or add the PR to the queue by hand'
+    }
+    return null
+  }
+  for (const event of timelineItems.nodes) {
+    if (event.__typename === 'AddedToMergeQueueEvent') {
+      added = queued = true
+    } else if (event.__typename === 'RemovedFromMergeQueueEvent') {
+      added = true
+      queued = false
+    } else {
+      const problem = endSegment(event.beforeCommit?.oid)
+      if (problem) return problem
+      head = event.afterCommit?.oid
+      added = queued
+    }
+  }
+  return endSegment(headSha)
+}
+
 // Consumers do not dismiss stale approvals, so an App approval of an old commit
-// would still count when a human merges a newer one. Returns false when an
-// approval remains.
-async function dismissStaleApprovals({ api, core, reviews, headSha }) {
+// would still count when a human merges a newer one. An approval on a PR that no
+// longer targets the default branch is dismissed as well, because the workflow
+// does not follow that PR. Returns false when an approval remains.
+async function dismissStaleApprovals({ api, core, pull, approvals }) {
   let dismissedAll = true
-  for (const review of reviews.filter((review) => isAppApproval(review) && review.commit_id !== headSha)) {
-    const message = 'The approved commit is no longer the head.'
-    if (!(await dismissApproval({ api, core, reviewId: review.id, message }))) dismissedAll = false
+  for (const review of approvals) {
+    const message = staleApprovalMessage({ pull, review })
+    if (message && !(await dismissApproval({ api, core, reviewId: review.id, message }))) dismissedAll = false
   }
   return dismissedAll
+}
+
+function staleApprovalMessage({ pull, review }) {
+  if (!targetsDefaultBranch(pull)) return 'The PR no longer targets the default branch.'
+  if (review.commit_id !== pull.head.sha) return 'The approved commit is no longer the head.'
+  return null
 }
 
 async function dismissApproval({ api, core, reviewId, message }) {
@@ -319,20 +423,31 @@ async function readChecks({ api, headSha }) {
   return { checkRuns, combinedStatus, workflowRuns }
 }
 
-async function readRequiredChecks({ api }) {
-  const { github, owner, repo, pull_number } = api
-  const { repository } = await github.graphql(REQUIRED_CHECKS_QUERY, { owner, repo, number: pull_number })
-  return repository.pullRequest.commits.nodes[0]?.commit
+// The Actions exception reads the files of the head commit, not of the PR, so
+// the result belongs to an immutable SHA. Provenance is checked first, so that
+// commit is the PR's only commit and its diff is the PR's diff. GitHub returns up to
+// 300 files and pages the rest; the exception then does not apply.
+async function readHeadCommitFiles({ api, headSha }) {
+  const { github, owner, repo } = api
+  const { data, headers } = await github.rest.repos.getCommit({ owner, repo, ref: headSha })
+  if (/rel="next"/.test(headers.link ?? '')) return null
+  return data.files
 }
 
-// Requests at most one Copilot review per set of dependency versions, so a
-// Dependabot rebase does not start a new review. A request that someone
-// removes before Copilot reviews leaves no trace, so it is requested again.
-// When it cannot read a commit that Copilot reviewed, it requests nothing and
-// tries again on the next run.
+async function readQueueAndRequiredChecks({ api }) {
+  const { github, owner, repo, pull_number } = api
+  const { repository } = await github.graphql(QUEUE_AND_REQUIRED_CHECKS_QUERY, { owner, repo, number: pull_number })
+  return repository.pullRequest
+}
+
+// Requests at most one Copilot review per dependency update, so a Dependabot
+// rebase or a maintainer's fix on top of the update does not start a new
+// review. A request that someone removes before Copilot reviews leaves no
+// trace, so it is requested again. When it cannot compare a commit with the
+// base branch, it requests nothing and tries again on the next run.
 // It reads the reviews after the pending requests, so a review that Copilot
 // submits between the two reads is still seen.
-async function requestCopilotReview({ api, core, log, headSha, dependencies }) {
+async function requestCopilotReview({ api, core, log, pull }) {
   const { github, owner, repo, pull_number } = api
   try {
     const { data: requested } = await github.rest.pulls.listRequestedReviewers({ owner, repo, pull_number })
@@ -342,10 +457,7 @@ async function requestCopilotReview({ api, core, log, headSha, dependencies }) {
     const reviewedCommits = new Set(
       reviews.filter((review) => COPILOT_LOGINS.has(review.user?.login)).map((review) => review.commit_id),
     )
-    if (reviewedCommits.has(headSha)) return
-    for (const commitId of reviewedCommits) {
-      if (await reviewedSameVersions({ api, commitId, dependencies })) return
-    }
+    if (await reviewedSameUpdate({ api, pull, reviewedCommits })) return
 
     await github.rest.pulls.requestReviewers({ owner, repo, pull_number, reviewers: [COPILOT_REVIEWER] })
     log('requested a Copilot review')
@@ -354,23 +466,72 @@ async function requestCopilotReview({ api, core, log, headSha, dependencies }) {
   }
 }
 
-async function reviewedSameVersions({ api, commitId, dependencies }) {
-  const current = dependencyFingerprint(dependencies)
+async function reviewedSameUpdate({ api, pull, reviewedCommits }) {
+  if (reviewedCommits.has(pull.head.sha)) return true
+  if (reviewedCommits.size === 0) return false
+  const head = await commitsAddedToBase({ api, base: pull.base.ref, commitId: pull.head.sha })
+  const current = head && updateIdentity(head.commits)
   if (!current) return false
-  const { github, owner, repo } = api
-  let reviewed
-  try {
-    ;({ data: reviewed } = await github.rest.repos.getCommit({ owner, repo, ref: commitId }))
-  } catch (error) {
-    throw new Error(`could not read commit ${commitId}, which Copilot reviewed: ${error.message}`)
+  for (const commitId of reviewedCommits) {
+    const reviewed = await commitsAddedToBase({ api, base: head.baseSha, commitId })
+    if (reviewed && updateIdentity(reviewed.commits) === current) return true
   }
-  return dependencyFingerprint(parseUpdatedDependencies(reviewed.commit.message)) === current
+  return false
 }
 
-const REQUIRED_CHECKS_QUERY = `
+// Lists the commits that a commit adds to the base branch, in chronological
+// order, and the base commit it compared with. A PR's commit list is not the
+// ancestry of a commit when the history branches, and GitHub does not document
+// its order. The head is compared with the base branch by name, so commits on
+// that branch, such as earlier Dependabot squash merges, are left out. The
+// reviewed commits are compared with the same base commit, even if the branch
+// has moved. Returns null when GitHub no longer has the commit or lists only
+// part of the history.
+async function commitsAddedToBase({ api, base, commitId }) {
+  const { github, owner, repo } = api
+  let data
+  try {
+    ;({ data } = await github.rest.repos.compareCommitsWithBasehead({ owner, repo, basehead: `${base}...${commitId}` }))
+  } catch (error) {
+    if (error.status === 404) return null
+    throw new Error(`could not compare commit ${commitId} with ${base}: ${error.message}`)
+  }
+  if (data.total_commits > data.commits.length) return null
+  return { baseSha: data.base_commit.sha, commits: data.commits }
+}
+
+// A maintainer can push a fix on top of the update, so the update is what the
+// commits that Dependabot wrote and GitHub signed agree on. Their versions
+// identify the update, or the commit itself when its message has no metadata.
+// When they disagree, for example after someone merges two updates, the update
+// that the commit contains is unknown.
+function updateIdentity(commits) {
+  const identities = new Set(
+    commits
+      .filter((commit) => dependabotCommitProblem(commit) === null)
+      .map((commit) => dependencyFingerprint(parseUpdatedDependencies(commit.commit.message)) ?? `commit ${commit.sha}`),
+  )
+  return identities.size === 1 ? [...identities][0] : null
+}
+
+const MERGE_QUEUE_HISTORY = `
+        timelineItems(
+          itemTypes: [ADDED_TO_MERGE_QUEUE_EVENT, REMOVED_FROM_MERGE_QUEUE_EVENT, HEAD_REF_FORCE_PUSHED_EVENT]
+          last: 100
+        ) {
+          pageInfo { hasPreviousPage }
+          nodes {
+            __typename
+            ... on HeadRefForcePushedEvent { beforeCommit { oid } afterCommit { oid } }
+          }
+        }`
+
+const QUEUE_AND_REQUIRED_CHECKS_QUERY = `
   query ($owner: String!, $repo: String!, $number: Int!) {
     repository(owner: $owner, name: $repo) {
       pullRequest(number: $number) {
+        isInMergeQueue
+        ${MERGE_QUEUE_HISTORY}
         commits(last: 1) {
           nodes {
             commit {
@@ -404,6 +565,7 @@ const PULL_REQUEST_QUERY = `
         baseRefName
         isInMergeQueue
         isMergeQueueEnabled
+        ${MERGE_QUEUE_HISTORY}
       }
     }
   }`
@@ -443,9 +605,9 @@ async function approveAndMerge({ github, appGithub, appSlug, context, core, cand
   }
 }
 
-// The policy depends only on the head commit, which every write binds to. The
-// list of commits also depends on the base branch, so provenance is checked
-// again here.
+// The policy depends only on the head commit and the files it changes, which
+// every write binds to. The list of commits also depends on the base branch, so
+// provenance is checked again here.
 async function approveAndMergePullRequest({ api, appGithub, core, headSha }) {
   const { github, owner, repo, pull_number } = api
   const gates = await checkMergeGates({ api, headSha })
@@ -484,12 +646,17 @@ async function mergePullRequest({ github, core, owner, repo, number, headSha }) 
     (pull.headRefOid !== headSha && 'the head changed after approval') ||
     (pull.baseRefName !== repository.defaultBranchRef.name && 'the PR does not target the default branch')
   if (blocker) throw new Error(blocker)
+  if (pull.isInMergeQueue) {
+    core.info(`PR #${number}: already in the merge queue`)
+    return
+  }
+  // Someone can add the PR to the queue, and GitHub remove it, while this run approves.
+  // This read and the addition below are separate requests, and GitHub can make the
+  // addition depend only on the head commit, so a short window remains.
+  const removal = queueRemovalProblem({ headSha, timelineItems: pull.timelineItems })
+  if (removal) throw new Error(removal)
 
   if (pull.isMergeQueueEnabled) {
-    if (pull.isInMergeQueue) {
-      core.info(`PR #${number}: already in the merge queue`)
-      return
-    }
     await github.graphql(ENQUEUE_MUTATION, { pullRequestId: pull.id, expectedHeadOid: headSha })
     core.info(`PR #${number}: added commit ${headSha} to the merge queue`)
     return
