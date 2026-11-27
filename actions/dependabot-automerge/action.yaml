@@ -17,13 +17,14 @@ outputs:
 runs:
   using: "composite"
   steps:
-    # The App key comes from the dependabot-automerge environment. Stop before
-    # doing anything when the environment lacks it.
+    # The App key comes from the dependabot-automerge environment, or from the
+    # repository secret until the key rotation. Stop before doing anything when
+    # the key is missing.
     - name: Check the App key
       if: inputs.app-private-key == ''
       shell: bash
       run: |
-        echo "::error::The secret AUTOMERGE_APP_PRIVATE_KEY is empty. Add it to the dependabot-automerge environment."
+        echo "::error::The secret AUTOMERGE_APP_PRIVATE_KEY is empty. Add it to the dependabot-automerge environment, or to the repository secrets until the key rotation."
         exit 1
 
     # The job token reads PRs and dismisses stale App approvals.

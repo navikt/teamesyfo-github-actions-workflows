@@ -27,7 +27,7 @@ on:
   workflow_call:
     secrets:
       AUTOMERGE_APP_PRIVATE_KEY:
-        description: "Private key for the teamesyfo-automerge GitHub App. Store it only as a secret in the dependabot-automerge environment."
+        description: "Private key for the teamesyfo-automerge GitHub App. After the key rotation, store it only as a secret in the dependabot-automerge environment."
         required: true
 
 permissions: {}

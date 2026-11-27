@@ -4,7 +4,7 @@ This document explains how to use `dependabot-automerge-v2.yaml` from `navikt/te
 
 The workflow has two jobs. The `automerge` job approves patch and minor updates and adds them to the merge queue. The `review` job asks Copilot to review the other updates, such as major updates, so that a human can decide faster.
 
-v1 is deprecated. Both versions use the same GitHub App. After the v2 pilot, repositories migrate one at a time, and the App owner revokes the v1 keys when the last repository has migrated. See [Migrate from v1](#migrate-from-v1).
+v1 is deprecated. Both versions use the same GitHub App. After the v2 pilot, repositories migrate one at a time with the existing key. When the last repository has migrated, the App owner replaces the key with a new key in the environments and revokes the old keys. See [Migrate from v1](#migrate-from-v1).
 
 ## Quick start
 
@@ -27,7 +27,7 @@ v1 is deprecated. Both versions use the same GitHub App. After the v2 pilot, rep
    ```
 
    Confirm that GitHub rejects the job because of the environment branch rules, then delete the temporary branch. If the job runs, fix the branch rules and repeat the test before storing the key.
-4. Store the v2 App key as the **environment secret** `AUTOMERGE_APP_PRIVATE_KEY` after the environment test passes. The App owner gives out the v2 key. Never reuse a key from v1. See [Migrate from v1](#migrate-from-v1).
+4. Store the App key as the **environment secret** `AUTOMERGE_APP_PRIVATE_KEY` after the environment test passes. The App owner gives out the key. Until the [key rotation](#migrate-from-v1), a repository that migrates from v1 skips this step and keeps the existing key in its repository secret.
 5. Turn off **Allow GitHub Actions to create and approve pull requests** in Settings -> Actions -> General, unless another workflow needs it. The App approves, not `GITHUB_TOKEN`. The default workflow permissions can stay read-only, because the workflow sets its own permissions.
 6. Turn on a merge queue for the default branch, in a ruleset or in branch protection. The workflow merges nothing without one. See [Merge queue](#merge-queue).
 7. Add at least one required status check on the default branch, in a ruleset or in branch protection. The check must come from CI that runs on `pull_request` and `merge_group`. The workflow merges nothing until the required checks have passed on the head commit. Do not add the App to a bypass list in any ruleset or branch protection rule, because GitHub must enforce the required checks when the App merges.
@@ -126,8 +126,8 @@ jobs:
 
 - Pin the workflow to a full commit SHA. The workflow uses the App key, so a change on `main` in this repository should not reach your repository before you update the pin.
 - The caller runs both jobs. The permissions above cover both.
-- Add the caller only after you have created and tested the environment (steps 2–4 in the [quick start](#quick-start)). If the environment does not exist when the workflow runs, GitHub creates it without protection rules.
-- The caller must pass the secret by name, although the secret only exists in the environment. The environment secret takes precedence.
+- Add the caller only after you have created and tested the environment (steps 2–3 in the [quick start](#quick-start)). If the environment does not exist when the workflow runs, GitHub creates it without protection rules.
+- The caller must pass the secret by name. Until the [key rotation](#migrate-from-v1), the workflow gets the existing key from the repository secret. After the rotation, the secret exists only in the environment, and the environment secret takes precedence over the secret that the caller passes.
 - Scheduled workflows run only on the default branch. In a public repository, GitHub disables scheduled workflows after 60 days without activity. Enable the workflow again in the Actions tab if that happens.
 
 ## Merge queue
@@ -159,12 +159,12 @@ Migrate one repository at a time. Repositories that have not migrated keep runni
 
 v2 merges fewer updates than v1. v1 automerges every GitHub Actions update, also major updates, and merges without a merge queue. v2 merges only patch and minor updates, only through a merge queue, and asks Copilot to review the rest.
 
-Both versions use the same App, and every private key of the App can create tokens for all its installations. A v1 key that is still valid can therefore approve and merge in a repository that already uses v2. The v2 protection of the key, which limits it to the default branch, applies to the App as a whole only after the App owner has revoked every key that v1 uses. Until then, the risk is the same as with v1 alone. Keep the migration short for this reason. In this guide, the App owner is an owner of the `navikt` organization or a person who is App manager for the App. Other members cannot see the App settings, so they cannot create or revoke keys. [GitHub App managers](https://docs.github.com/en/organizations/managing-programmatic-access-to-your-organization/adding-and-removing-github-app-managers-in-your-organization) [GitHub App private keys](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/managing-private-keys-for-github-apps)
+Both versions use the same App, and every private key of the App can create tokens for all its installations. The migration therefore keeps the existing key, which every repository already has as a repository secret. The App owner replaces it in one step at the end. Until then, any workflow on any branch in these repositories can read the key, so a person with write access to one repository can approve and merge pull requests in every repository where the App is installed. This is the same risk as with v1. The v2 protection of the key, which limits it to the default branch, applies only after the key rotation. Keep the migration short for this reason. In this guide, the App owner is an owner of the `navikt` organization or a person who is App manager for the App. Other members cannot see the App settings, so they cannot create or revoke keys. [GitHub App managers](https://docs.github.com/en/organizations/managing-programmatic-access-to-your-organization/adding-and-removing-github-app-managers-in-your-organization) [GitHub App private keys](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/managing-private-keys-for-github-apps)
 
-1. **Run the pilot.** The App owner creates a new private key for the App. This is the v2 key. Store it in the environment of a test repository, and run the [pilot](#verify-the-pilot). Do not migrate other repositories before the pilot passes.
+1. **Run the pilot.** Run the [pilot](#verify-the-pilot) in a test repository with the existing key. Do not migrate other repositories before the pilot passes.
 2. **Migrate each repository.** In each repository:
-   1. Do steps 2–10 in the [quick start](#quick-start), with the v2 key in step 4.
-   2. Delete the Dependabot secret `AUTOMERGE_APP_PRIVATE_KEY`, and any repository secret that contains an App key. Do this before you add the v2 caller, because the caller would otherwise pass a repository secret to the workflow if the environment secret is missing. Without the secret, v1 stops before it approves anything.
+   1. Do steps 2, 3 and 5–10 in the [quick start](#quick-start). Skip step 4, and keep the repository secret `AUTOMERGE_APP_PRIVATE_KEY` with the existing key.
+   2. Delete the Dependabot secret `AUTOMERGE_APP_PRIVATE_KEY`. Without it, v1 stops before it approves anything. v2 runs on a schedule or by hand, and then GitHub gives it the repository secret, not the Dependabot secret.
    3. On open Dependabot pull requests, turn off the auto-merge that v1 enabled, and dismiss the approvals from `github-actions[bot]`. Do this before you add the v2 caller. v2 dismisses only approvals from the App, so an old approval from v1 still counts as the required review, also for a later commit. Run this from a clone of the repository, as a user who can dismiss reviews:
 
       ```bash
@@ -182,11 +182,25 @@ Both versions use the same App, and every private key of the App can create toke
 
    4. Replace the caller workflow with the [v2 caller](#caller-workflow). Remove the `pull_request` trigger.
    5. Start the workflow manually on the default branch once, and read the job log.
-3. **Revoke the v1 keys.** When no repository uses v1, the App owner revokes every key except the v2 key in the GitHub App settings. Check that no Dependabot, repository or organization secret still contains an old key. Tokens that an old key has already created stay valid for up to one hour. [Installation access tokens](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app) Then `dependabot-automerge.yaml` (v1) can be deleted.
+3. **Rotate the key.** When no repository uses v1, the App owner creates a new private key for the App in the GitHub App settings. Then, for each repository, store the new key as the environment secret and delete the repository secret. The script skips a repository whose environment is missing or open to every branch. Run it as a user who can manage secrets in the repositories:
+
+   ```bash
+   key_file=<path to the new key>.pem
+   for repo in navikt/<repository> navikt/<another repository>; do
+     if [ "$(gh api "repos/$repo/environments/dependabot-automerge" --jq '.deployment_branch_policy.custom_branch_policies')" != true ]; then
+       echo "$repo: skipped, check the environment"
+       continue
+     fi
+     gh secret set AUTOMERGE_APP_PRIVATE_KEY --repo "$repo" --env dependabot-automerge < "$key_file" &&
+       gh secret delete AUTOMERGE_APP_PRIVATE_KEY --repo "$repo"
+   done
+   ```
+
+   Start the workflow by hand in one repository, and confirm that the job log shows no key error. Then the App owner revokes every other key of the App, and deletes the local copy of the new key. Check that no Dependabot, repository or organization secret still contains an old key. Tokens that an old key has already created stay valid for up to one hour. [Installation access tokens](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app) Then `dependabot-automerge.yaml` (v1) can be deleted.
 
 ## Verify the pilot
 
-Use a test repository with the App installed, the v2 key in its environment, a protected default branch with a merge queue, and Copilot code review set up as in step 9 of the [quick start](#quick-start). Install the pinned [caller](#caller-workflow) there with just the `workflow_dispatch` trigger. A manual run evaluates every open Dependabot pull request, so keep only the pull requests for the current part of the test open. Keep links to the runs and the pull requests with the rollout record.
+Use a test repository with the App installed, the environment from steps 2–3 in the [quick start](#quick-start), the existing key in the repository secret `AUTOMERGE_APP_PRIVATE_KEY`, a protected default branch with a merge queue, and Copilot code review set up as in step 9 of the [quick start](#quick-start). Install the pinned [caller](#caller-workflow) there with just the `workflow_dispatch` trigger. A manual run evaluates every open Dependabot pull request, so keep only the pull requests for the current part of the test open. Keep links to the runs and the pull requests with the rollout record.
 
 **Merge queue.** Use a single eligible patch or minor update, with no existing App approval of its head.
 
@@ -204,7 +218,7 @@ Use a test repository with the App installed, the v2 key in its environment, a p
 
 ## Security model and remaining risks
 
-- The job that holds the App key never checks out or runs pull request code. The key is only available to the default branch, through the environment, and the job runs only on the schedule or on a manual run on the default branch.
+- The job that holds the App key never checks out or runs pull request code. The job runs only on the schedule or on a manual run on the default branch. After the [key rotation](#migrate-from-v1), the key is only available to the default branch, through the environment.
 - The first step of the `automerge` job and the whole `review` job use only `GITHUB_TOKEN` and never approve. The workflow creates the App token only when at least one pull request is ready.
 - The approval and the queue entry are bound to the head commit that the workflow checked, and the workflow checks every condition again just before it approves.
 - Only an untouched, verified Dependabot commit that GitHub's branch activity shows Dependabot pushed can be automerged, and only after the required checks of the repository have passed.
@@ -216,8 +230,8 @@ Remaining risks:
 - A malicious version of a dependency that passes CI is still merged. CI, required checks and a Dependabot cooldown reduce this risk.
 - If Copilot approvals are turned on in the repository or the organization, a Copilot approval can satisfy the required review of an update that the policy left for a human. The workflow cannot read these settings. Check them in every repository, see step 9 in the [quick start](#quick-start).
 - Copilot reads release notes and other text that the maintainers of a dependency control. Such text can try to steer the review. The review instructions tell Copilot not to follow it, and a human still decides.
-- Anyone who can change workflows on a trusted default branch or change its environment protections can gain access to the App key. Consumers holding a key for this App therefore share trust across its installations, even after the v1 keys have been revoked.
-- Until the App owner has revoked every v1 key, a v1 key can approve and merge in every repository where the App is installed, also in repositories that use v2. See [Migrate from v1](#migrate-from-v1).
+- Anyone who can change workflows on a trusted default branch or change its environment protections can gain access to the App key. Consumers holding a key for this App therefore share trust across its installations, even after the key rotation.
+- Until the key rotation, the existing key is a repository secret in every repository that uses the App. Anyone who can push a workflow to a branch in one of these repositories can read the key, and approve and merge pull requests in every repository where the App is installed. Copies of the key outside GitHub stay valid until the App owner revokes it. See [Migrate from v1](#migrate-from-v1).
 - If someone pushes to a pull request that the App has approved, the App approval of the old commit still counts until the next run dismisses it. During that time, a human can merge the new commit without a new approval. The same applies when someone changes the base branch of a pull request that the App has approved. If the workflow cannot dismiss the approval, it skips the pull request, and the approval stays until someone dismisses it. **Dismiss stale pull request approvals when new commits are pushed** closes this gap for pushes, but then every push to any pull request needs a new approval. No setting closes the gap for a changed base branch.
 - If only some people may dismiss reviews in the repository, `GITHUB_TOKEN` may not be allowed to dismiss approvals. Then the workflow skips pull requests with an App approval of an old commit, and a person must dismiss the approval.
 - A required check appears on a commit only after it reports. The App relies on GitHub to enforce outstanding required checks at merge time. Verify the App has no bypass in each repository and run the [pilot](#verify-the-pilot) before rollout.
@@ -233,8 +247,8 @@ The job log records each evaluated pull request and its outcome, including `PR #
 | --- | --- |
 | The workflow never runs | Check that the caller workflow is on the default branch, and that GitHub has not disabled the schedule. |
 | The job waits for or is rejected by the environment | Check that the environment allows the default branch, and that it has no required reviewers, wait timer or custom deployment protection rule. |
-| `The secret AUTOMERGE_APP_PRIVATE_KEY is empty` | Add the key as an environment secret in `dependabot-automerge`. |
-| `The App token belongs to "...", but the workflow expects teamesyfo-automerge[bot].` | Check that the configured App, its current slug and its environment key all belong to `teamesyfo-automerge`. |
+| `The secret AUTOMERGE_APP_PRIVATE_KEY is empty` | Before the key rotation, check the repository secret `AUTOMERGE_APP_PRIVATE_KEY`. After the rotation, add the key as an environment secret in `dependabot-automerge`. |
+| `The App token belongs to "...", but the workflow expects teamesyfo-automerge[bot].` | Check that the configured App, its current slug and its key all belong to `teamesyfo-automerge`. |
 | `The merge window is closed. This run merges no pull requests.` or `not ready: the merge window is closed` | Wait for the merge window, or start the workflow manually. |
 | `not ready: no required check has reported` | Add a required status check on the default branch, and make sure that CI runs on `pull_request`. See [Security model](#security-model-and-remaining-risks) if the repository already has one. |
 | `not ready: required check "..." is failure` | Fix the build, or run the check again. |
