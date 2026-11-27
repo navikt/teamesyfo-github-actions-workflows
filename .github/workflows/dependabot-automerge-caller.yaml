@@ -12,10 +12,10 @@ permissions: {}
 
 jobs:
   automerge:
-    # Off until an admin has set up the protected environment with the v2 key,
-    # has deleted any repository secret with an App key, and the pilot has
-    # passed. Otherwise GitHub creates the environment without protection and
-    # uses the repository secret. Turn it on with the repository variable
+    # Off until the pilot has passed and an admin has done the migration steps
+    # in docs/dependabot-automerge.md: the environment limited to the default
+    # branch, no Dependabot secret with the App key, and no v1 approvals on
+    # open Dependabot PRs. Turn it on with the repository variable
     # DEPENDABOT_AUTOMERGE_ENABLED=true.
     if: vars.DEPENDABOT_AUTOMERGE_ENABLED == 'true'
     permissions:
