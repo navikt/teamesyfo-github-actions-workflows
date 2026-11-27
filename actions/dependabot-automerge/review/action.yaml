@@ -1,0 +1,18 @@
+name: "Dependabot Copilot review"
+description: >-
+  Requests a Copilot code review of each Dependabot pull request that the
+  automerge policy leaves for a human, once per head commit. Uses only the job
+  token. Never checks out or runs code from a pull request.
+  See docs/dependabot-automerge.md.
+
+runs:
+  using: "composite"
+  steps:
+    - name: Request Copilot review of Dependabot updates that need a human
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+      with:
+        script: |
+          const automerge = require(`${process.env.ACTION_PATH}/../automerge.js`)
+          await automerge.requestCopilotReviews({ github, context, core })

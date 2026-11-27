@@ -1,0 +1,74 @@
+name: "Dependabot automerge"
+description: >-
+  Approves and merges Dependabot pull requests that follow the team policy.
+  Never checks out or runs code from a pull request.
+  See docs/dependabot-automerge.md.
+
+inputs:
+  app-private-key:
+    description: "Private key for the teamesyfo-automerge GitHub App. Only the approve and merge step uses it."
+    required: true
+
+outputs:
+  candidates:
+    description: "JSON list of the pull requests and head commits that were ready to merge when the run started."
+    value: ${{ steps.find.outputs.candidates }}
+
+runs:
+  using: "composite"
+  steps:
+    # The App key comes from the dependabot-automerge environment, or from the
+    # repository secret until the key rotation. Stop before doing anything when
+    # the key is missing.
+    - name: Check the App key
+      if: inputs.app-private-key == ''
+      shell: bash
+      run: |
+        echo "::error::The secret AUTOMERGE_APP_PRIVATE_KEY is empty. Add it to the dependabot-automerge environment, or to the repository secrets until the key rotation."
+        exit 1
+
+    # The job token reads PRs and dismisses stale App approvals.
+    - name: Find Dependabot pull requests that are ready to merge
+      id: find
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+      with:
+        script: |
+          const automerge = require(`${process.env.ACTION_PATH}/automerge.js`)
+          await automerge.findMergeCandidates({ github, context, core })
+
+    # The App approves, so its approval counts as the required review. It also
+    # merges, because GITHUB_TOKEN can neither add pull requests to a merge
+    # queue nor trigger the workflows that run after a merge.
+    - name: Create GitHub App token
+      id: app-token
+      if: steps.find.outputs.candidates != '' && steps.find.outputs.candidates != '[]'
+      uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+      with:
+        client-id: Iv23liqxZsjVqOVzo0se # teamesyfo-automerge (App ID 2906300)
+        private-key: ${{ inputs.app-private-key }}
+        permission-contents: write
+        permission-pull-requests: write
+
+    # github stays GITHUB_TOKEN, so the fresh check of every gate and any
+    # dismissal use the same identity as the find step.
+    - name: Approve and merge Dependabot pull requests
+      if: steps.find.outputs.candidates != '' && steps.find.outputs.candidates != '[]'
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        APP_TOKEN: ${{ steps.app-token.outputs.token }}
+        APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+        CANDIDATES: ${{ steps.find.outputs.candidates }}
+      with:
+        script: |
+          const automerge = require(`${process.env.ACTION_PATH}/automerge.js`)
+          await automerge.approveAndMerge({
+            github,
+            appGithub: getOctokit(process.env.APP_TOKEN),
+            appSlug: process.env.APP_SLUG,
+            context,
+            core,
+            candidates: JSON.parse(process.env.CANDIDATES),
+          })

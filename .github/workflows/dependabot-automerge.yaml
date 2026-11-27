@@ -1,5 +1,10 @@
 name: Dependabot auto-approve and auto-merge
 
+# DEPRECATED: use dependabot-automerge-v2.yaml. This version runs on
+# pull_request with a Dependabot secret, approves without binding the approval
+# to a commit, and lets later commits merge through auto-merge. It stays until
+# all consumers have migrated. See docs/dependabot-automerge.md.
+#
 # Reusable workflow that auto-approves and enables auto-merge for
 # Dependabot PRs. GitHub Actions updates are always automerged (including
 # major), while other ecosystems (npm, Maven, etc.) are limited to

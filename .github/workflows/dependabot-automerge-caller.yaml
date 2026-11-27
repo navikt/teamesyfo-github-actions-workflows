@@ -1,16 +1,31 @@
-name: Dependabot auto-approve and auto-merge (this repo)
+name: Dependabot automerge (this repo)
 
 on:
-  pull_request:
-    types: [opened, reopened, synchronize]
+  schedule:
+    # Every 30 minutes on weekdays, 07:00–15:30 in Oslo. The workflow itself
+    # pauses on 1 May, 17 May and 24 December–1 January.
+    - cron: "*/30 7-15 * * 1-5"
+      timezone: "Europe/Oslo"
+  workflow_dispatch:
+
+permissions: {}
 
 jobs:
   automerge:
+    # Off until the pilot has passed and an admin has done the migration steps
+    # in docs/dependabot-automerge.md: the environment limited to the default
+    # branch, no Dependabot secret with the App key, and no v1 approvals on
+    # open Dependabot PRs. Turn it on with the repository variable
+    # DEPENDABOT_AUTOMERGE_ENABLED=true.
+    if: vars.DEPENDABOT_AUTOMERGE_ENABLED == 'true'
     permissions:
-      contents: write
+      actions: read
+      checks: read
+      contents: read
       pull-requests: write
+      statuses: read
     # Self-repository reference: pinning this repo's own SHA would make
     # Dependabot open a new bump PR after every merge.
-    uses: $/.github/workflows/dependabot-automerge.yaml
+    uses: $/.github/workflows/dependabot-automerge-v2.yaml
     secrets:
-      APP_PRIVATE_KEY: ${{ secrets.AUTOMERGE_APP_PRIVATE_KEY }}
+      AUTOMERGE_APP_PRIVATE_KEY: ${{ secrets.AUTOMERGE_APP_PRIVATE_KEY }}
