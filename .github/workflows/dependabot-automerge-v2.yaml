@@ -15,18 +15,9 @@ name: Dependabot automerge (v2)
 #     required check, the workflow merges nothing.
 #   - "Allow GitHub Actions to create and approve pull requests" turned off,
 #     unless another workflow needs it. The App approves, not GITHUB_TOKEN.
-#   - Copilot approvals turned off, so that a Copilot approval cannot count
-#     toward the merge requirements. copilot-review: false only stops the
-#     review requests from this workflow.
 
 on:
   workflow_call:
-    inputs:
-      copilot-review:
-        description: "Request a comment-only Copilot review on updates that need a manual review."
-        required: false
-        type: boolean
-        default: true
     secrets:
       AUTOMERGE_APP_PRIVATE_KEY:
         description: "Private key for the teamesyfo-automerge GitHub App. Store it only as a secret in the dependabot-automerge environment."
@@ -63,4 +54,3 @@ jobs:
         uses: $/actions/dependabot-automerge
         with:
           app-private-key: ${{ secrets.AUTOMERGE_APP_PRIVATE_KEY }}
-          copilot-review: ${{ inputs.copilot-review }}

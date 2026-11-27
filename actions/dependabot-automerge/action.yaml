@@ -8,10 +8,6 @@ inputs:
   app-private-key:
     description: "Private key for the teamesyfo-automerge GitHub App. Only the approve and merge step uses it."
     required: true
-  copilot-review:
-    description: "Request a comment-only Copilot review on updates that need a manual review."
-    required: false
-    default: "true"
 
 outputs:
   candidates:
@@ -30,23 +26,16 @@ runs:
         echo "::error::The secret AUTOMERGE_APP_PRIVATE_KEY is empty. Add it to the dependabot-automerge environment."
         exit 1
 
-    # Uses the job's GITHUB_TOKEN, which never approves. It only reads,
-    # requests Copilot reviews and dismisses stale App approvals.
+    # The job token reads PRs and dismisses stale App approvals.
     - name: Find Dependabot pull requests that are ready to merge
       id: find
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
         ACTION_PATH: ${{ github.action_path }}
-        COPILOT_REVIEW: ${{ inputs.copilot-review }}
       with:
         script: |
           const automerge = require(`${process.env.ACTION_PATH}/automerge.js`)
-          await automerge.findMergeCandidates({
-            github,
-            context,
-            core,
-            copilotReview: process.env.COPILOT_REVIEW === 'true',
-          })
+          await automerge.findMergeCandidates({ github, context, core })
 
     # The App approves, so its approval counts as the required review. It also
     # merges, because GITHUB_TOKEN can neither add pull requests to a merge

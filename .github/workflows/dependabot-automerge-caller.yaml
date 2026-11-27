@@ -12,10 +12,8 @@ permissions: {}
 
 jobs:
   automerge:
-    # Off until an admin has set up the protected environment and its secret,
-    # and has deleted the repository secret with the App key. Otherwise GitHub
-    # creates the environment without protection and uses that secret. Turn
-    # it on with the repository variable DEPENDABOT_AUTOMERGE_ENABLED=true.
+    # Enable after the team has retired the v1 keys, configured the protected
+    # environment and verified the App's merge permissions in the pilot.
     if: vars.DEPENDABOT_AUTOMERGE_ENABLED == 'true'
     permissions:
       actions: read
