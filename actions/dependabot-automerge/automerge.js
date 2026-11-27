@@ -65,36 +65,10 @@ function parseUpdatedDependencies(message) {
   return dependencies
 }
 
-function ecosystemFromBranch(ref) {
-  const match = /^dependabot\/([^/]+)\//.exec(ref)
-  return match ? match[1] : null
-}
-
-// Repositories can change the branch template, so the branch name alone does
-// not prove an Actions update. The exception also requires that the head
-// commit only changes existing workflow and action files.
-const WORKFLOW_FILE = /^\.github\/workflows\/[^/]+\.ya?ml$/
-const ACTION_FILE = /(^|\/)action\.ya?ml$/
-
-function changesOnlyActionsFiles(files) {
-  return (
-    files?.length > 0 &&
-    files.every(
-      (file) => file.status === 'modified' && (WORKFLOW_FILE.test(file.filename) || ACTION_FILE.test(file.filename)),
-    )
-  )
-}
-
-// The rule for every ecosystem: automerge patch and minor updates. A major
-// GitHub Actions update is an exception, and only then are the files read.
-async function decidePolicy({ ecosystem, dependencies, readFiles }) {
-  const byMetadata = metadataPolicy(dependencies)
-  if (byMetadata.automerge || ecosystem !== 'github_actions') return byMetadata
-  if (!changesOnlyActionsFiles(await readFiles())) return byMetadata
-  return { automerge: true, reason: 'GitHub Actions updates are always automerged' }
-}
-
-function metadataPolicy(dependencies) {
+// The one rule for every ecosystem, shared by the merge and the review steps:
+// automerge only when every dependency in the update is a patch or a minor
+// update. Everything else, also a missing update type, needs a review.
+function classifyUpdate(dependencies) {
   if (!dependencies?.length) {
     return { automerge: false, reason: 'the commit has no Dependabot metadata' }
   }
@@ -194,6 +168,9 @@ function isMergeWindowOpen(date) {
 }
 
 const APPROVER_LOGIN = 'teamesyfo-automerge[bot]'
+// The merge queue runs the required checks on the result of the merge, so it is
+// the only path the workflow merges through.
+const NO_MERGE_QUEUE = 'the default branch has no merge queue; merge the PR by hand'
 const HEAD_UPDATES = new Set(['branch_creation', 'push', 'force_push'])
 const DECISIVE_REVIEW_STATES = new Set(['APPROVED', 'CHANGES_REQUESTED', 'DISMISSED'])
 const SHA = /^[0-9a-f]{40}$/
@@ -277,15 +254,12 @@ async function checkMergeGates({ api, core, expectedHeadSha, windowOpen = true }
   const commits = await github.paginate(github.rest.pulls.listCommits, { owner, repo, pull_number, per_page: 100 })
   const provenance = checkProvenance({ headSha, commits })
   if (!provenance.ok) return provenance
-  const policy = await decidePolicy({
-    ecosystem: ecosystemFromBranch(pull.head.ref),
-    dependencies: parseUpdatedDependencies(commits[0].commit.message),
-    readFiles: () => readHeadCommitFiles({ api, headSha }),
-  })
+  const policy = classifyUpdate(parseUpdatedDependencies(commits[0].commit.message))
   if (!policy.automerge) return blocked(policy.reason)
   const checks = summarizeChecks(await readChecks({ api, headSha }))
   if (checks.state !== 'success') return blocked(checks.reason)
   const state = await readQueueAndRequiredChecks({ api })
+  if (!state.isMergeQueueEnabled) return blocked(NO_MERGE_QUEUE)
   if (state.isInMergeQueue) return blocked('the PR is already in the merge queue')
   const removal = queueRemovalProblem({ headSha, timelineItems: state.timelineItems })
   if (removal) return blocked(removal)
@@ -399,17 +373,6 @@ async function readChecks({ api, headSha }) {
   return { checkRuns, combinedStatus, workflowRuns }
 }
 
-// The Actions exception reads the files of the head commit, not of the PR, so
-// the result belongs to an immutable SHA. Provenance is checked first, so that
-// commit is the PR's only commit and its diff is the PR's diff. GitHub returns up to
-// 300 files and pages the rest; the exception then does not apply.
-async function readHeadCommitFiles({ api, headSha }) {
-  const { github, owner, repo } = api
-  const { data, headers } = await github.rest.repos.getCommit({ owner, repo, ref: headSha })
-  if (/rel="next"/.test(headers.link ?? '')) return null
-  return data.files
-}
-
 async function readQueueAndRequiredChecks({ api }) {
   const { github, owner, repo, pull_number } = api
   const { repository } = await github.graphql(QUEUE_AND_REQUIRED_CHECKS_QUERY, { owner, repo, number: pull_number })
@@ -433,6 +396,7 @@ const QUEUE_AND_REQUIRED_CHECKS_QUERY = `
     repository(owner: $owner, name: $repo) {
       pullRequest(number: $number) {
         isInMergeQueue
+        isMergeQueueEnabled
         ${MERGE_QUEUE_HISTORY}
         commits(last: 1) {
           nodes {
@@ -547,6 +511,7 @@ async function mergePullRequest({ github, core, owner, repo, number, headSha }) 
     (pull.headRefOid !== headSha && 'the head changed after approval') ||
     (pull.baseRefName !== repository.defaultBranchRef.name && 'the PR does not target the default branch')
   if (blocker) throw new Error(blocker)
+  if (!pull.isMergeQueueEnabled) throw new Error(NO_MERGE_QUEUE)
   if (pull.isInMergeQueue) {
     core.info(`PR #${number}: already in the merge queue`)
     return
@@ -557,24 +522,67 @@ async function mergePullRequest({ github, core, owner, repo, number, headSha }) 
   const removal = queueRemovalProblem({ headSha, timelineItems: pull.timelineItems })
   if (removal) throw new Error(removal)
 
-  if (pull.isMergeQueueEnabled) {
-    core.info(`PR #${number}: requesting merge queue entry for commit ${headSha} as ${APPROVER_LOGIN}`)
-    await github.graphql(ENQUEUE_MUTATION, { pullRequestId: pull.id, expectedHeadOid: headSha })
-    core.info(`PR #${number}: added commit ${headSha} to the merge queue`)
-    return
+  core.info(`PR #${number}: requesting merge queue entry for commit ${headSha} as ${APPROVER_LOGIN}`)
+  await github.graphql(ENQUEUE_MUTATION, { pullRequestId: pull.id, expectedHeadOid: headSha })
+  core.info(`PR #${number}: added commit ${headSha} to the merge queue`)
+}
+
+const COPILOT_REVIEWER = 'copilot-pull-request-reviewer[bot]'
+// GitHub lists a pending request as the user Copilot and the review as the bot.
+const COPILOT_LOGINS = new Set(['Copilot', COPILOT_REVIEWER])
+
+// Runs with GITHUB_TOKEN. Asks Copilot to review each update that the policy
+// leaves for a human, once per head commit. Copilot only comments; a human
+// decides whether to approve and merge.
+async function requestCopilotReviews({ github, context, core }) {
+  const { owner, repo } = context.repo
+  const pulls = await github.paginate(github.rest.pulls.list, { owner, repo, state: 'open', per_page: 100 })
+  const reviewable = pulls.filter((pull) => isDependabotPullRequest(pull) && targetsDefaultBranch(pull) && !pull.draft)
+  let failures = 0
+  for (const pull of reviewable) {
+    const api = { github, owner, repo, pull_number: pull.number }
+    try {
+      const skip = await reasonToSkipCopilotReview({ api, pull })
+      if (skip) {
+        core.info(`PR #${pull.number}: no Copilot review requested: ${skip}`)
+        continue
+      }
+      await github.rest.pulls.requestReviewers({ owner, repo, pull_number: pull.number, reviewers: [COPILOT_REVIEWER] })
+      core.info(`PR #${pull.number}: requested a Copilot review of commit ${pull.head.sha}`)
+    } catch (error) {
+      failures++
+      core.warning(`PR #${pull.number}: could not request a Copilot review: ${error.message}`)
+    }
   }
-  core.info(`PR #${number}: requesting squash merge of commit ${headSha} as ${APPROVER_LOGIN}`)
-  await github.rest.pulls.merge({ owner, repo, pull_number: number, merge_method: 'squash', sha: headSha })
-  core.info(`PR #${number}: squash-merged commit ${headSha}`)
+  if (failures > 0) core.setFailed(`Could not request a Copilot review on ${failures} pull request(s).`)
+}
+
+// The latest Dependabot commit decides, so a maintainer's follow-up commit
+// neither hides a major update nor turns a patch update into a review.
+async function reasonToSkipCopilotReview({ api, pull }) {
+  const { github, owner, repo, pull_number } = api
+  if (pull.requested_reviewers?.some((reviewer) => COPILOT_LOGINS.has(reviewer.login))) {
+    return 'a Copilot review is already requested'
+  }
+  const commits = await github.paginate(github.rest.pulls.listCommits, { owner, repo, pull_number, per_page: 100 })
+  const update = commits.findLast((commit) => commit.author?.login === DEPENDABOT_LOGIN)
+  const policy = classifyUpdate(update && parseUpdatedDependencies(update.commit.message))
+  if (policy.automerge) return policy.reason
+  const reviews = await github.paginate(github.rest.pulls.listReviews, { owner, repo, pull_number, per_page: 100 })
+  if (reviews.some((review) => COPILOT_LOGINS.has(review.user?.login) && review.commit_id === pull.head.sha)) {
+    return `Copilot has reviewed commit ${pull.head.sha}`
+  }
+  return null
 }
 
 module.exports = {
   parseUpdatedDependencies,
-  decidePolicy,
+  classifyUpdate,
   checkProvenance,
   summarizeChecks,
   summarizeRequiredChecks,
   isMergeWindowOpen,
   findMergeCandidates,
   approveAndMerge,
+  requestCopilotReviews,
 }

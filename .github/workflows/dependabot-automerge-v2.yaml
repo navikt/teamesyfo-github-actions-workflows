@@ -1,20 +1,27 @@
 name: Dependabot automerge (v2)
 
-# Reusable workflow that approves and merges Dependabot pull requests.
-# Call it on a schedule from the default branch. It never checks out or runs
-# code from a pull request, and it approves and merges only the exact commit
-# it has checked. See docs/dependabot-automerge.md for the policy, the setup
-# and the migration from dependabot-automerge.yaml (v1).
+# Reusable workflow for Dependabot pull requests. Call it on a schedule from
+# the default branch. It never checks out or runs code from a pull request.
+#   - automerge: approves patch and minor updates and adds the exact commit it
+#     has checked to the merge queue.
+#   - review: asks Copilot to review every other update, such as a major
+#     update, so a human can decide faster. Copilot only comments.
+# See docs/dependabot-automerge.md for the policy, the setup and the migration
+# from dependabot-automerge.yaml (v1).
 #
 # Prerequisites in the calling repository:
 #   - An environment named "dependabot-automerge" that only the default
 #     branch can use, with the secret AUTOMERGE_APP_PRIVATE_KEY.
 #   - The teamesyfo-automerge GitHub App installed on the repository.
+#   - A merge queue on the default branch. Without it, the workflow merges
+#     nothing.
 #   - At least one required status check on the default branch, from CI that
-#     runs on pull_request (and merge_group with a merge queue). Without a
-#     required check, the workflow merges nothing.
+#     runs on pull_request and merge_group. Without a required check, the
+#     workflow merges nothing.
 #   - "Allow GitHub Actions to create and approve pull requests" turned off,
 #     unless another workflow needs it. The App approves, not GITHUB_TOKEN.
+#   - Copilot code review available in the repository, with Copilot approvals
+#     turned off, so a Copilot review never counts as an approval.
 
 on:
   workflow_call:
@@ -54,3 +61,22 @@ jobs:
         uses: $/actions/dependabot-automerge
         with:
           app-private-key: ${{ secrets.AUTOMERGE_APP_PRIVATE_KEY }}
+
+  review:
+    name: Request Copilot review of Dependabot PRs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The same triggers as the automerge job. The job uses only GITHUB_TOKEN,
+    # so it needs neither the environment nor the App key.
+    if: >-
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
+    concurrency:
+      group: teamesyfo-dependabot-review
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Request Copilot review of Dependabot PRs
+        uses: $/actions/dependabot-automerge/review

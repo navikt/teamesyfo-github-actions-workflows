@@ -8,7 +8,7 @@ Dette repoet samler reusable workflows og composite actions for Team eSyfo sine 
 | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `.github/workflows/next-app-v2.yaml`          | Next.js-workflow med `pnpm`, `actions/setup-pnpm`, `actions/build-next-app`, merge-gate og sperrer mot publisering og deploy fra merge queue. | [docs/next-app.md](docs/next-app.md)                         |
 | `.github/workflows/jar-app.yaml`              | JVM-workflow for `shadowJar`-baserte apper i GCP.                                                                             | [docs/jvm-app.md](docs/jvm-app.md)                           |
-| `.github/workflows/dependabot-automerge-v2.yaml` | Godkjenner og merger trygge Dependabot-PR-er etter tidsplan. Nøkkelen til GitHub-appen ligger i et miljø som bare default-branchen får bruke. | [docs/dependabot-automerge.md](docs/dependabot-automerge.md) |
+| `.github/workflows/dependabot-automerge-v2.yaml` | Godkjenner patch- og minor-oppdateringer fra Dependabot etter tidsplan og legger dem i merge queue. Ber Copilot om review av resten, for eksempel major-oppdateringer. Nøkkelen til GitHub-appen ligger i et miljø som bare default-branchen får bruke. | [docs/dependabot-automerge.md](docs/dependabot-automerge.md) |
 | `.github/workflows/next-app.yaml`             | **Legacy!** Next.js-workflow med `npm`, `actions/npm-cached` og `actions/next-to-docker`. **New apps shall not use npm!**     | [docs/next-app.md](docs/next-app.md)                         |
 | `.github/workflows/boot-jar-app.yaml`         | **Legacy!** JVM-workflow for `bootJar`-baserte apper i GCP.                                                                   | [docs/jvm-app.md](docs/jvm-app.md)                           |
 | `.github/workflows/dependabot-automerge.yaml` | **Utgått!** Første versjon av Dependabot-automerge. Bytt til `dependabot-automerge-v2.yaml`.                                 | [Migrering fra v1](docs/dependabot-automerge.md#migrate-from-v1) |
@@ -23,6 +23,7 @@ Dette repoet samler reusable workflows og composite actions for Team eSyfo sine 
 | `actions/gradle-cached`      | Setter opp Java og Gradle, validerer wrapper og bruker Gradle-cache.                                          |
 | `actions/playwright-e2e`     | Installerer Playwright-browsere, kjører E2E-tester og laster opp rapport.                                     |
 | `actions/dependabot-automerge` | Motoren i `dependabot-automerge-v2.yaml`. Brukes gjennom workflowen, ikke direkte.                          |
+| `actions/dependabot-automerge/review` | Ber Copilot om review av Dependabot-PR-er som v2 ikke merger selv. Brukes gjennom workflowen, ikke direkte. |
 | `actions/next-to-docker`     | **Legacy!** Setter opp `npm`, bygger Next.js-appen, laster opp statiske filer til CDN og bygger Docker-image. |
 | `actions/boot-jar-to-docker` | **Legacy!** Bygger `bootJar` og bygger Docker-image.                                                          |
 | `actions/npm-cached`         | **Legacy!** Setter opp Node.js og installerer `npm`-avhengigheter med cache.                                  |
